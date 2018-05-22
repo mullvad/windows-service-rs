@@ -6,27 +6,46 @@ use winapi::um::winsvc;
 mod errors {
     error_chain! {
         errors {
+            /// Invalid service name.
             InvalidServiceName {
                 description("Invalid service name")
             }
         }
         foreign_links {
-            System(::std::io::Error);
+            System(::std::io::Error) #[doc = "System call error."];
         }
     }
 }
 pub use self::errors::*;
 
-/// Macro to generate a "service_main" function for Windows service.
+/// A macro to generate an entry point function (aka "service_main") for Windows service.
 ///
-/// The `service_main` function parses service arguments provided by the system
+/// The `$function_name` function parses service arguments provided by the system
 /// and passes them with a call to `$service_main_handler`.
 ///
 /// `$function_name` - name of the "service_main" callback.
+///
 /// `$service_main_handler` - function with a signature `fn(Vec<OsString>)` that's called from
 /// generated `$function_name`. Accepts parsed service arguments as `Vec<OsString>`. Its
 /// responsibility is to create a `ServiceControlHandler`, start processing control events and
 /// report the service status to the system.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// #[macro_use]
+/// extern crate windows_service;
+///
+/// use std::ffi::OsString;
+///
+/// define_windows_service!(ffi_service_main, my_service_main);
+///
+/// fn my_service_main(arguments: Vec<OsString>) {
+///     // Service entry point
+/// }
+///
+/// # fn main() {}
+/// ```
 ///
 #[macro_export]
 macro_rules! define_windows_service {
@@ -46,13 +65,34 @@ macro_rules! define_windows_service {
 /// Once started the service control dispatcher blocks the current thread execution
 /// until the service is stopped.
 ///
-/// Upon successful initialization, system calls the `service_main` in
-/// background thread which parses service arguments received from the system and
-/// passes them to higher level `$service_main_handler` handler.
+/// Upon successful initialization, system calls the `service_main` on background thread.
 ///
 /// On failure: immediately returns an error, no threads are spawned.
 ///
-pub fn start_dispatcher<T: AsRef<OsStr>>(
+/// # Example
+///
+/// ```rust,no_run
+/// #[macro_use]
+/// extern crate windows_service;
+///
+/// use std::ffi::OsString;
+/// use windows_service::service_dispatcher;
+///
+/// define_windows_service!(ffi_service_main, my_service_main);
+///
+/// fn my_service_main(arguments: Vec<OsString>) {
+///     // The entry point where execution will start on a background thread after a call to
+///     // `service_dispatcher::start` from `main`.
+/// }
+///
+/// fn main() {
+///     // Register generated `ffi_service_main` with the system and start the service, blocking
+///     // this thread until the service is stopped.
+///     service_dispatcher::start("myservice", ffi_service_main).unwrap();
+/// }
+/// ```
+///
+pub fn start<T: AsRef<OsStr>>(
     service_name: T,
     service_main: extern "system" fn(u32, *mut *mut u16),
 ) -> Result<()> {
@@ -78,7 +118,10 @@ pub fn start_dispatcher<T: AsRef<OsStr>>(
     }
 }
 
-/// Parse raw arguments received from `service_main` into Vec.
+/// Parse raw arguments received in `service_main` into `Vec<OsString>`.
+///
+/// This is an implementation detail and *should not* be called directly!
+#[doc(hidden)]
 pub unsafe fn parse_raw_arguments(argc: u32, argv: *mut *mut u16) -> Vec<OsString> {
     (0..argc)
         .into_iter()
