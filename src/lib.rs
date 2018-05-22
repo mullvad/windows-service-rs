@@ -1,3 +1,127 @@
+// Copyright 2017 Amagicom AB.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+//! A crate that provides facilities for management and implementation of windows services.
+//!
+//! # Implementing windows service
+//!
+//! This section describes the steps to create a windows service, for complete source code take a
+//! look at examples folder.
+//!
+//! ## Basics
+//!
+//! Each windows service has to implement a `service_main` function and register it with the system
+//! from the application's `main`. This crate provides a handy `define_windows_service!` macro to
+//! generate a low level boilerplate for `service_main`.
+//!
+//! ```rust,no_run
+//! #[macro_use]
+//! extern crate windows_service;
+//! use std::ffi::OsString;
+//! use windows_service::service_dispatcher;
+//!
+//! define_windows_service!(service_main, handle_service_main);
+//!
+//! fn handle_service_main(arguments: Vec<OsString>) {
+//!     // Do service work
+//! }
+//!
+//! fn main() {
+//!     // Register generated `service_main` with the system and start the service blocking main
+//!     // thread until the service is stopped.
+//!     service_dispatcher::start_dispatcher("myservice", service_main).unwrap();
+//! }
+//! ```
+//!
+//! ## Handling service events
+//!
+//! The first thing that windows service should do early in its lifecycle is to subscribe for
+//! service events such as stop or pause and many other.
+//!
+//! It's worth to mention that events are dispatched concurrently so it's important to make sure
+//! that your code is thread safe, the simplest way is to use `mpsc::channel`.
+//!
+//! ```rust,no_run
+//! #[macro_use]
+//! extern crate windows_service;
+//! use std::ffi::OsString;
+//! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+//!
+//! fn handle_service_main(arguments: Vec<OsString>) {
+//!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
+//!         match control_event {
+//!             ServiceControl::Stop => {
+//!                 // Handle stop event and return control back to the system.
+//!                 ServiceControlHandlerResult::NoError
+//!             }
+//!             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+//!             _ => ServiceControlHandlerResult::NotImplemented,
+//!         }
+//!     };
+//!
+//!     // Register system service event handler.
+//!     let status_handle =
+//!         service_control_handler::register_control_handler("myservice", event_handler).unwrap();
+//! }
+//! ```
+//!
+//! ## Updating service status
+//!
+//! The service status handle (`service_control_handler::ServiceStatusHandle`) is issued upon
+//! successful event handler registration (see `service_control_handler::register_control_handler`)
+//! and should be used to notify the system about any changes to the service's internal state
+//! during its lifecycle.
+//!
+//! Note that it's safe to clone the service status handle to pass it to other thread.
+//!
+//! ```rust,no_run
+//! #[macro_use]
+//! extern crate windows_service;
+//! use std::ffi::OsString;
+//! use std::thread;
+//! use windows_service::service::{
+//!     ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
+//! };
+//! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+//!
+//! fn handle_service_main(arguments: Vec<OsString>) {
+//!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
+//!         match control_event {
+//!             ServiceControl::Stop | ServiceControl::Interrogate => {
+//!                 ServiceControlHandlerResult::NoError
+//!             }
+//!             _ => ServiceControlHandlerResult::NotImplemented,
+//!         }
+//!     };
+//!     let status_handle =
+//!         service_control_handler::register_control_handler(SERVICE_NAME, event_handler).unwrap();
+//!
+//!     let worker_thread = thread::spawn(move || {
+//!         let service_status = ServiceStatus {
+//!             service_type: ServiceType::OwnProcess,
+//!             current_state: ServiceState::Running,
+//!             controls_accepted: ServiceControlAccept::STOP,
+//!             exit_code: ServiceExitCode::Win32(0),
+//!             checkpoint: 0,
+//!             wait_hint: Duration::default(),
+//!         };
+//!
+//!         // Tell the system that the service is running now
+//!         status_handle.set_service_status(service_status);
+//!
+//!         // Do some work..
+//!     });
+//!
+//!     // Block service_main while the worker is running
+//!     worker_thread.join().unwrap();
+//! }
+//! ```
+
 #![cfg(windows)]
 
 #[macro_use]
