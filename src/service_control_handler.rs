@@ -9,18 +9,19 @@ use service::{ServiceControl, ServiceStatus};
 mod errors {
     error_chain! {
         errors {
+            /// Invalid service name.
             InvalidServiceName {
                 description("Invalid service name")
             }
         }
         foreign_links {
-            System(::std::io::Error);
+            System(::std::io::Error) #[doc = "System call error."];
         }
     }
 }
 pub use self::errors::*;
 
-/// Struct that holds unique token for updating the status of the corresponding service.
+/// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]
 pub struct ServiceStatusHandle(winsvc::SERVICE_STATUS_HANDLE);
 
@@ -29,7 +30,7 @@ impl ServiceStatusHandle {
         ServiceStatusHandle(handle)
     }
 
-    /// Report the new service status to the system
+    /// Report the new service status to the system.
     pub fn set_service_status(&self, service_status: ServiceStatus) -> io::Result<()> {
         let mut raw_service_status = service_status.to_raw();
         let result = unsafe { winsvc::SetServiceStatus(self.0, &mut raw_service_status) };
@@ -48,8 +49,10 @@ unsafe impl Send for ServiceStatusHandle {}
 
 /// Abstraction over the return value of service control handler.
 /// The meaning of each of variants in this enum depends on the type of received event.
+///
 /// See the "Return value" section of corresponding MSDN article for more info:
-/// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683241(v=vs.85).aspx
+///
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms683241(v=vs.85).aspx>
 #[derive(Debug)]
 pub enum ServiceControlHandlerResult {
     /// Either used to aknowledge the call or grant the permission in advanced events.
@@ -72,14 +75,35 @@ impl ServiceControlHandlerResult {
 }
 
 /// Register a closure for receiving service events.
-/// Returns `ServiceStatusHandle` that can be used to report the service status back to the system.
-pub fn register_control_handler<
+///
+/// Returns [`ServiceStatusHandle`] that can be used to report the service status back to the
+/// system.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use std::ffi::OsString;
+/// use windows_service::service::ServiceControl;
+/// use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+///
+/// fn my_service_main(arguments: Vec<OsString>) {
+///     let event_handler = move |control_event| -> ServiceControlHandlerResult {
+///         match control_event {
+///             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+///             _ => ServiceControlHandlerResult::NotImplemented,
+///         }
+///     };
+///     let status_handle =
+///         service_control_handler::register("my_service_name", event_handler).unwrap();
+/// }
+///
+/// # fn main() {}
+/// ```
+pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle>
+where
     S: AsRef<OsStr>,
-    F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static,
->(
-    service_name: S,
-    event_handler: F,
-) -> Result<ServiceStatusHandle> {
+    F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static + Send,
+{
     // Move closure data on heap.
     // The Box<HandlerFn> is a trait object and is stored on stack at this point.
     let heap_event_handler = Box::new(event_handler) as Box<HandlerFn>;
