@@ -1,7 +1,7 @@
 [package]
 name = "windows-service"
 version = "0.1.0"
-authors = ["Mullvad VPN <admin@mullvad.net>", "Andrej Mihajlov <and@mullvad.net>"]
+authors = ["Mullvad VPN <admin@mullvad.net>", "Andrej Mihajlov <and@mullvad.net>", "Linus Färnstrand <linus@mullvad.net>"]
 
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.0.1"
