@@ -107,6 +107,8 @@
 //!     let status_handle = service_control_handler::register(SERVICE_NAME, event_handler).unwrap();
 //!
 //!     let worker_thread = thread::spawn(move || {
+//!         // Please refer to MSDN regarding the rules of filling in the ServiceStatus struct.
+//!         // See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx
 //!         let service_status = ServiceStatus {
 //!             service_type: ServiceType::OwnProcess,
 //!             current_state: ServiceState::Running,
