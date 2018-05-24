@@ -9,9 +9,15 @@ complete source code of such program take a look at examples folder.
 
 ### Basics
 
-Each windows service has to implement a `service_main` function and register it with the system
-from the application's `main`. This crate provides a handy `define_windows_service!` macro to
-generate a low level boilerplate for `service_main`.
+Each windows service has to implement a service entry function `fn(argc: u32, argv: *mut *mut
+u16)` and register it with the system from the application's `main`.
+
+This crate provides a handy [`define_windows_service!`] macro to generate a low level
+boilerplate for the service entry function that parses input from the system and delegates
+handling to user defined higher level function `fn(arguments: Vec<OsString>)`.
+
+This guide references the low level entry function as `service_main` and higher
+level function as `handle_service_main` but it's up to developer how to call them.
 
 ```rust
 #[macro_use]
