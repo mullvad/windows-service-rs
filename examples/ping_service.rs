@@ -66,7 +66,7 @@ mod ping_service {
         let event_handler = move |control_event| -> ServiceControlHandlerResult {
             match control_event {
                 // Notifies a service to report its current status information to the service
-                // control manager. Always return NO_ERROR even if not implemented.
+                // control manager. Always return NoError even if not implemented.
                 ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
 
                 // Handle stop
