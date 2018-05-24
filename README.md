@@ -4,8 +4,8 @@ A crate that provides facilities for management and implementation of windows se
 
 ## Implementing windows service
 
-This section describes the steps to create a windows service, for complete source code take a
-look at examples folder.
+This section describes the steps of implementing a program that runs as a windows service, for
+complete source code of such program take a look at examples folder.
 
 ### Basics
 
