@@ -44,21 +44,21 @@ mod ping_service {
     static SERVICE_TYPE: ServiceType = ServiceType::OwnProcess;
 
     pub fn run() {
-        // Register generated `service_main` with the system and start the service blocking main
+        // Register generated `ffi_service_main` with the system and start the service blocking main
         // thread until the service is stopped.
-        service_dispatcher::start_dispatcher(SERVICE_NAME, service_main).unwrap();
+        service_dispatcher::start_dispatcher(SERVICE_NAME, ffi_service_main).unwrap();
     }
 
     // Generate the windows service boilerplate.
-    // The boilerplate contains the low-level service entry function (service_main) that parses
+    // The boilerplate contains the low-level service entry function (ffi_service_main) that parses
     // incoming service arguments into Vec<OsString> and passes them to user defined service
-    // entry (handle_service_main).
-    define_windows_service!(service_main, handle_service_main);
+    // entry (my_service_main).
+    define_windows_service!(ffi_service_main, my_service_main);
 
     // Service entry function which is called on background thread by the system with service
     // parameters. There is no stdout or stderr at this point so make sure to configure the log
     // output to file if needed.
-    pub fn handle_service_main(_arguments: Vec<OsString>) {
+    pub fn my_service_main(_arguments: Vec<OsString>) {
         // Create an event channel to funnel events to worker.
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
