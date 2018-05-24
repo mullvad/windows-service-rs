@@ -215,12 +215,19 @@ impl ServiceState {
 
 /// Service exit code abstraction.
 ///
-/// This struct provides a logic around the relationship between `win32_exit_code` and
-/// `service_specific_exit_code`.
+/// This struct provides a logic around the relationship between [`dwWin32ExitCode`] and
+/// [`dwServiceSpecificExitCode`].
 ///
-/// The service can either return a win32 error code or a custom error
-/// code. In that case `win32_exit_code` has to be set to `ERROR_SERVICE_SPECIFIC_ERROR` and
-/// the `service_specific_exit_code` assigned with custom error code.
+/// The service can either return a win32 error code or a custom error code. In case of custom
+/// error, [`dwWin32ExitCode`] has to be set to [`ERROR_SERVICE_SPECIFIC_ERROR`] and the
+/// [`dwServiceSpecificExitCode`] assigned with custom error code.
+///
+/// Refer to the corresponding MSDN article for more info:
+///
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
+///
+/// [`dwWin32ExitCode`]: winsvc::SERVICE_STATUS::dwWin32ExitCode
+/// [`dwServiceSpecificExitCode`]: winsvc::SERVICE_STATUS::dwServiceSpecificExitCode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceExitCode {
     Win32(u32),

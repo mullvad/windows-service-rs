@@ -48,8 +48,10 @@ unsafe impl Send for ServiceStatusHandle {}
 
 /// Abstraction over the return value of service control handler.
 /// The meaning of each of variants in this enum depends on the type of received event.
+///
 /// See the "Return value" section of corresponding MSDN article for more info:
-/// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683241(v=vs.85).aspx
+///
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms683241(v=vs.85).aspx>
 #[derive(Debug)]
 pub enum ServiceControlHandlerResult {
     /// Either used to aknowledge the call or grant the permission in advanced events.
@@ -72,7 +74,8 @@ impl ServiceControlHandlerResult {
 }
 
 /// Register a closure for receiving service events.
-/// Returns `ServiceStatusHandle` that can be used to report the service status back to the system.
+/// Returns [`ServiceStatusHandle`] that can be used to report the service status back to the
+/// system.
 pub fn register<S: AsRef<OsStr>, F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static>(
     service_name: S,
     event_handler: F,

@@ -17,16 +17,30 @@ mod errors {
 }
 pub use self::errors::*;
 
-/// Macro to generate a "service_main" function for Windows service.
+/// Macro to generate an entry point function (aka "service_main") for Windows service.
 ///
-/// The `service_main` function parses service arguments provided by the system
+/// The `$function_name` function parses service arguments provided by the system
 /// and passes them with a call to `$service_main_handler`.
 ///
 /// `$function_name` - name of the "service_main" callback.
+///
 /// `$service_main_handler` - function with a signature `fn(Vec<OsString>)` that's called from
 /// generated `$function_name`. Accepts parsed service arguments as `Vec<OsString>`. Its
 /// responsibility is to create a `ServiceControlHandler`, start processing control events and
 /// report the service status to the system.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// #[macro_use]
+/// extern crate windows_service;
+///
+/// define_windows_service!(ffi_service_main, my_service_main);
+///
+/// fn my_service_main(arguments: Vec<OsString>) {
+///     // Service entry point
+/// }
+/// ```
 ///
 #[macro_export]
 macro_rules! define_windows_service {
