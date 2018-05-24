@@ -47,7 +47,7 @@
 //!
 //! ## Handling service events
 //!
-//! The first thing that windows service should do early in its lifecycle is to subscribe for
+//! The first thing that a windows service should do early in its lifecycle is to subscribe for
 //! service events such as stop or pause and many other.
 //!
 //! It's worth to mention that events are dispatched concurrently so it's important to make sure
