@@ -97,20 +97,20 @@ mod ping_service {
             .unwrap();
 
         let worker_thread_handle = thread::spawn(move || {
+            let ipv4 = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+            let sender_addr = SocketAddr::new(ipv4, 0);
+            let receiver_addr = SocketAddr::new(ipv4, 1234);
+            let msg = "ping\n".as_bytes();
+            let socket = UdpSocket::bind(sender_addr).unwrap();
+
             loop {
                 // For demo purposes this worker sends a UDP packet once a second.
-                let ipv4 = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-                let sender_addr = SocketAddr::new(ipv4, 0);
-                let receiver_addr = SocketAddr::new(ipv4, 1234);
-                let msg = "ping".as_bytes();
-                let _ = UdpSocket::bind(sender_addr)
-                    .unwrap()
-                    .send_to(msg, receiver_addr);
+                let _ = socket.send_to(msg, receiver_addr);
 
                 // Poll shutdown event.
                 match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
                     // Break the loop either upon stop or channel disconnect
-                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
 
                     // Continue work if no events were received within the timeout
                     Err(mpsc::RecvTimeoutError::Timeout) => (),
