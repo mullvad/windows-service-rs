@@ -73,10 +73,7 @@ impl ServiceControlHandlerResult {
 
 /// Register a closure for receiving service events.
 /// Returns `ServiceStatusHandle` that can be used to report the service status back to the system.
-pub fn register_control_handler<
-    S: AsRef<OsStr>,
-    F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static,
->(
+pub fn register<S: AsRef<OsStr>, F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static>(
     service_name: S,
     event_handler: F,
 ) -> Result<ServiceStatusHandle> {

@@ -81,8 +81,7 @@ mod ping_service {
 
         // Register system service event handler.
         // The returned status handle should be used to report service status changes to the system.
-        let status_handle =
-            service_control_handler::register_control_handler(SERVICE_NAME, event_handler).unwrap();
+        let status_handle = service_control_handler::register(SERVICE_NAME, event_handler).unwrap();
 
         // Tell the system that service is running
         status_handle

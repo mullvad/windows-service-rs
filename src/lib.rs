@@ -72,15 +72,14 @@
 //!     };
 //!
 //!     // Register system service event handler.
-//!     let status_handle =
-//!         service_control_handler::register_control_handler("myservice", event_handler).unwrap();
+//!     let status_handle = service_control_handler::register("myservice", event_handler).unwrap();
 //! }
 //! ```
 //!
 //! ## Updating service status
 //!
 //! The service status handle (`service_control_handler::ServiceStatusHandle`) is issued upon
-//! successful event handler registration (see `service_control_handler::register_control_handler`)
+//! successful event handler registration (see `service_control_handler::register`)
 //! and should be used to notify the system about any changes to the service's internal state
 //! during its lifecycle.
 //!
@@ -105,8 +104,7 @@
 //!             _ => ServiceControlHandlerResult::NotImplemented,
 //!         }
 //!     };
-//!     let status_handle =
-//!         service_control_handler::register_control_handler(SERVICE_NAME, event_handler).unwrap();
+//!     let status_handle = service_control_handler::register(SERVICE_NAME, event_handler).unwrap();
 //!
 //!     let worker_thread = thread::spawn(move || {
 //!         let service_status = ServiceStatus {
