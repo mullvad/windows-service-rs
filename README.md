@@ -28,7 +28,8 @@ use windows_service::service_dispatcher;
 define_windows_service!(service_main, handle_service_main);
 
 fn handle_service_main(arguments: Vec<OsString>) {
-    // Do service work
+    // The entry point where execution will start on a background thread after a call to
+    // [`start_dispatcher`] from `main`.
 }
 
 fn main() {
