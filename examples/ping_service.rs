@@ -59,7 +59,7 @@ mod ping_service {
     // parameters. There is no stdout or stderr at this point so make sure to configure the log
     // output to file if needed.
     pub fn my_service_main(_arguments: Vec<OsString>) {
-        // Create an event channel to funnel events to worker.
+        // Create a channel to be able to poll a stop event from the service worker loop.
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
         // Define system service event handler that will be receiving service events.
@@ -95,30 +95,25 @@ mod ping_service {
             })
             .unwrap();
 
-        let worker_thread_handle = thread::spawn(move || {
-            let ipv4 = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-            let sender_addr = SocketAddr::new(ipv4, 0);
-            let receiver_addr = SocketAddr::new(ipv4, 1234);
-            let msg = "ping\n".as_bytes();
-            let socket = UdpSocket::bind(sender_addr).unwrap();
+        // For demo purposes this service sends a UDP packet once a second.
+        let ipv4 = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+        let sender_addr = SocketAddr::new(ipv4, 0);
+        let receiver_addr = SocketAddr::new(ipv4, 1234);
+        let msg = "ping\n".as_bytes();
+        let socket = UdpSocket::bind(sender_addr).unwrap();
 
-            loop {
-                // For demo purposes this worker sends a UDP packet once a second.
-                let _ = socket.send_to(msg, receiver_addr);
+        loop {
+            let _ = socket.send_to(msg, receiver_addr);
 
-                // Poll shutdown event.
-                match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
-                    // Break the loop either upon stop or channel disconnect
-                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            // Poll shutdown event.
+            match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
+                // Break the loop either upon stop or channel disconnect
+                Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
 
-                    // Continue work if no events were received within the timeout
-                    Err(mpsc::RecvTimeoutError::Timeout) => (),
-                };
-            }
-        });
-
-        // Block current thread while worker thread is running.
-        worker_thread_handle.join().unwrap();
+                // Continue work if no events were received within the timeout
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+            };
+        }
 
         // Tell the system that service has stopped.
         status_handle

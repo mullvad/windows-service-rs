@@ -115,14 +115,19 @@ pub struct ServiceInfo {
     /// Service name
     pub name: OsString,
 
-    /// Friendly service name
+    /// User-friendly service name
     pub display_name: OsString,
 
+    /// The service type
     pub service_type: ServiceType,
+
+    /// The service startup options
     pub start_type: ServiceStartType,
+
+    /// The severity of the error, and action taken, if this service fails to start.
     pub error_control: ServiceErrorControl,
 
-    /// Path to the service binary.
+    /// Path to the service binary
     pub executable_path: PathBuf,
 
     /// Launch arguments passed to `main` when system starts the service.
@@ -222,8 +227,7 @@ impl ServiceState {
 /// error, [`dwWin32ExitCode`] has to be set to [`ERROR_SERVICE_SPECIFIC_ERROR`] and the
 /// [`dwServiceSpecificExitCode`] assigned with custom error code.
 ///
-/// Refer to the corresponding MSDN article for more info:
-///
+/// Refer to the corresponding MSDN article for more info:\
 /// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
 ///
 /// [`dwWin32ExitCode`]: winsvc::SERVICE_STATUS::dwWin32ExitCode
@@ -293,6 +297,13 @@ bitflags! {
 }
 
 /// Service status.
+/// This struct wraps the lower level [`SERVICE_STATUS`] providing a few convenience types to fill
+/// in the service status information. However it doesn't fully guard the developer from producing
+/// an invalid `ServiceStatus`, therefore please refer to the corresponding MSDN article and in
+/// particular how to fill in the `exit_code`, `checkpoint`, `wait_hint` fields:\
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
+///
+/// [`SERVICE_STATUS`]: winsvc::SERVICE_STATUS
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceStatus {
     /// Type of service
@@ -301,23 +312,24 @@ pub struct ServiceStatus {
     /// Current state of the service
     pub current_state: ServiceState,
 
-    /// Control commands that service accepts.
+    /// Control commands that service accepts
     pub controls_accepted: ServiceControlAccept,
 
-    /// Service exit code
+    /// The error code the service uses to report an error that occurs when it is starting or
+    /// stopping
     pub exit_code: ServiceExitCode,
 
     /// Service initialization progress value that should be increased during a lengthy start,
-    /// stop, pause or continue eration. For example the service should increment the value as
+    /// stop, pause or continue operations. For example the service should increment the value as
     /// it completes each step of initialization.
     /// This value must be zero if the service does not have any pending start, stop, pause or
     /// continue operations.
     pub checkpoint: u32,
 
     /// Estimated time for pending operation.
-    /// This basically works as a timeout until the service manager assumes that the service hung.
-    /// This could be either circumvented by updating the `current_state` or incrementing a
-    /// `checkpoint` value.
+    /// This basically works as a timeout until the system assumes that the service hung.
+    /// This could be either circumvented by updating the [`current_state`] or incrementing a
+    /// [`checkpoint`] value.
     pub wait_hint: Duration,
 }
 

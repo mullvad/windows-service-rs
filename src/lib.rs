@@ -35,13 +35,13 @@
 //!
 //! fn my_service_main(arguments: Vec<OsString>) {
 //!     // The entry point where execution will start on a background thread after a call to
-//!     // [`start_dispatcher`] from `main`.
+//!     // [`service_dispatcher::start`] from `main`.
 //! }
 //!
 //! fn main() {
 //!     // Register generated `ffi_service_main` with the system and start the service blocking main
 //!     // thread until the service is stopped.
-//!     service_dispatcher::start_dispatcher("myservice", ffi_service_main).unwrap();
+//!     service_dispatcher::start("myservice", ffi_service_main).unwrap();
 //! }
 //! ```
 //!
@@ -51,7 +51,7 @@
 //! service events such as stop or pause and many other.
 //!
 //! It's worth to mention that events are dispatched concurrently so it's important to make sure
-//! that your code is thread safe, the simplest way is to use `mpsc::channel`.
+//! that your code is thread safe, the simplest way is to use [`std::sync::mpsc::channel`].
 //!
 //! ```rust,no_run
 //! #[macro_use]
@@ -78,8 +78,8 @@
 //!
 //! ## Updating service status
 //!
-//! The service status handle (`service_control_handler::ServiceStatusHandle`) is issued upon
-//! successful event handler registration (see `service_control_handler::register`)
+//! The service status handle ([`service_control_handler::ServiceStatusHandle`]) is issued upon
+//! successful event handler registration (see [`service_control_handler::register`])
 //! and should be used to notify the system about any changes to the service's internal state
 //! during its lifecycle.
 //!
@@ -106,26 +106,21 @@
 //!     };
 //!     let status_handle = service_control_handler::register(SERVICE_NAME, event_handler).unwrap();
 //!
-//!     let worker_thread = thread::spawn(move || {
-//!         // Please refer to MSDN regarding the rules of filling in the ServiceStatus struct.
-//!         // See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx
-//!         let service_status = ServiceStatus {
-//!             service_type: ServiceType::OwnProcess,
-//!             current_state: ServiceState::Running,
-//!             controls_accepted: ServiceControlAccept::STOP,
-//!             exit_code: ServiceExitCode::Win32(0),
-//!             checkpoint: 0,
-//!             wait_hint: Duration::default(),
-//!         };
+//!     // Please refer to documentation for `ServiceStatus` regarding the rules of assigning each
+//!     // of the fields.
+//!     let service_status = ServiceStatus {
+//!         service_type: ServiceType::OwnProcess,
+//!         current_state: ServiceState::Running,
+//!         controls_accepted: ServiceControlAccept::STOP,
+//!         exit_code: ServiceExitCode::Win32(0),
+//!         checkpoint: 0,
+//!         wait_hint: Duration::default(),
+//!     };
 //!
-//!         // Tell the system that the service is running now
-//!         status_handle.set_service_status(service_status);
+//!     // Tell the system that the service is running now
+//!     status_handle.set_service_status(service_status);
 //!
-//!         // Do some work..
-//!     });
-//!
-//!     // Block my_service_main while the worker is running
-//!     worker_thread.join().unwrap();
+//!     // Do some work..
 //! }
 //! ```
 
