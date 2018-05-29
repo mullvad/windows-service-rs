@@ -172,6 +172,7 @@ extern crate winapi;
 
 pub use error_chain::ChainedError;
 
+mod sc_handle;
 pub mod service;
 pub mod service_control_handler;
 pub mod service_manager;
