@@ -5,6 +5,7 @@ use std::{io, ptr};
 use widestring::{NulError, WideCString, WideString};
 use winapi::um::winsvc;
 
+use sc_handle::ScHandle;
 use service::{Service, ServiceAccess, ServiceInfo};
 use shell_escape;
 
@@ -60,13 +61,15 @@ bitflags! {
         /// Can create services.
         const CREATE_SERVICE = winsvc::SC_MANAGER_CREATE_SERVICE;
 
-        /// Can enumerate services.
+        /// Can enumerate services or receive notifications.
         const ENUMERATE_SERVICE = winsvc::SC_MANAGER_ENUMERATE_SERVICE;
     }
 }
 
 /// Service manager.
-pub struct ServiceManager(winsvc::SC_HANDLE);
+pub struct ServiceManager {
+    manager_handle: ScHandle,
+}
 
 impl ServiceManager {
     /// Private initializer.
@@ -96,7 +99,9 @@ impl ServiceManager {
         if handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(ServiceManager(handle))
+            Ok(ServiceManager {
+                manager_handle: unsafe { ScHandle::new(handle) },
+            })
         }
     }
 
@@ -201,7 +206,7 @@ impl ServiceManager {
 
         let service_handle = unsafe {
             winsvc::CreateServiceW(
-                self.0,
+                self.manager_handle.raw_handle(),
                 service_name.as_ptr(),
                 display_name.as_ptr(),
                 service_access.bits(),
@@ -220,7 +225,7 @@ impl ServiceManager {
         if service_handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(unsafe { Service::from_handle(service_handle) })
+            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
     }
 
@@ -250,20 +255,19 @@ impl ServiceManager {
         request_access: ServiceAccess,
     ) -> Result<Service> {
         let service_name = WideCString::from_str(name).chain_err(|| ErrorKind::InvalidServiceName)?;
-        let service_handle =
-            unsafe { winsvc::OpenServiceW(self.0, service_name.as_ptr(), request_access.bits()) };
+        let service_handle = unsafe {
+            winsvc::OpenServiceW(
+                self.manager_handle.raw_handle(),
+                service_name.as_ptr(),
+                request_access.bits(),
+            )
+        };
 
         if service_handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(unsafe { Service::from_handle(service_handle) })
+            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
-    }
-}
-
-impl Drop for ServiceManager {
-    fn drop(&mut self) {
-        unsafe { winsvc::CloseServiceHandle(self.0) };
     }
 }
 
