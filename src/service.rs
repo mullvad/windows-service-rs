@@ -6,6 +6,8 @@ use std::{io, mem};
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
+use sc_handle::ScHandle;
+
 mod errors {
     error_chain! {
         errors {
@@ -339,7 +341,7 @@ pub struct ServiceStatus {
 }
 
 impl ServiceStatus {
-    pub(super) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
+    pub(crate) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         raw_status.dwServiceType = self.service_type.to_raw();
         raw_status.dwCurrentState = self.current_state.to_raw();
@@ -369,18 +371,18 @@ impl ServiceStatus {
     }
 }
 
-
 /// A struct that represents a system service.
 ///
 /// The instances of the [`Service`] can be obtained via [`ServiceManager`].
 ///
 /// [`ServiceManager`]: super::service_manager::ServiceManager
-pub struct Service(winsvc::SC_HANDLE);
+pub struct Service {
+    service_handle: ScHandle,
+}
 
 impl Service {
-    /// Internal constructor.
-    pub(super) unsafe fn from_handle(handle: winsvc::SC_HANDLE) -> Self {
-        Service(handle)
+    pub(crate) fn new(service_handle: ScHandle) -> Self {
+        Service { service_handle }
     }
 
     /// Stop the service.
@@ -391,7 +393,9 @@ impl Service {
     /// Get the service status from the system.
     pub fn query_status(&self) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
-        let success = unsafe { winsvc::QueryServiceStatus(self.0, &mut raw_status) };
+        let success = unsafe {
+            winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
+        };
         if success == 1 {
             ServiceStatus::from_raw(raw_status)
         } else {
@@ -401,7 +405,7 @@ impl Service {
 
     /// Delete the service from system registry.
     pub fn delete(self) -> io::Result<()> {
-        let success = unsafe { winsvc::DeleteService(self.0) };
+        let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
         if success == 1 {
             Ok(())
         } else {
@@ -412,18 +416,18 @@ impl Service {
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
-        let success = unsafe { winsvc::ControlService(self.0, command.to_raw(), &mut raw_status) };
+        let success = unsafe {
+            winsvc::ControlService(
+                self.service_handle.raw_handle(),
+                command.to_raw(),
+                &mut raw_status,
+            )
+        };
 
         if success == 1 {
             ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
         } else {
             Err(io::Error::last_os_error().into())
         }
-    }
-}
-
-impl Drop for Service {
-    fn drop(&mut self) {
-        unsafe { winsvc::CloseServiceHandle(self.0) };
     }
 }
