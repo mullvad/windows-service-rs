@@ -6,30 +6,35 @@ use std::{io, mem};
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
+use sc_handle::ScHandle;
+
 mod errors {
     error_chain! {
         errors {
+            /// Invalid raw representation of [`ServiceType`].
             InvalidServiceType(raw_value: u32) {
                 description("Invalid service type value")
                 display("Invalid service type value: {}", raw_value)
             }
+            /// Invalid raw representation of [`ServiceState`].
             InvalidServiceState(raw_value: u32) {
                 description("Invalid service state")
                 display("Invalid service state value: {}", raw_value)
             }
+            /// Invalid raw representation of [`ServiceControl`].
             InvalidServiceControl(raw_value: u32) {
                 description("Invalid service control")
                 display("Invalid service control value: {}", raw_value)
             }
         }
         foreign_links {
-            System(::std::io::Error);
+            System(::std::io::Error) #[doc = "System call error."];
         }
     }
 }
 pub use self::errors::*;
 
-/// Enum describing types of windows services
+/// Enum describing the types of Windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceType {
@@ -51,8 +56,8 @@ impl ServiceType {
     }
 }
 
-/// Flags describing the access permissions when working with services
 bitflags! {
+    /// Flags describing the access permissions when working with services
     pub struct ServiceAccess: u32 {
         /// Can query the service status
         const QUERY_STATUS = winsvc::SERVICE_QUERY_STATUS;
@@ -74,7 +79,7 @@ bitflags! {
     }
 }
 
-/// Enum describing the start options for windows services
+/// Enum describing the start options for windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceStartType {
@@ -93,7 +98,8 @@ impl ServiceStartType {
 }
 
 /// Error handling strategy for service failures.
-/// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms682450(v=vs.85).aspx
+///
+/// See <https://msdn.microsoft.com/en-us/library/windows/desktop/ms682450(v=vs.85).aspx>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceErrorControl {
@@ -109,20 +115,25 @@ impl ServiceErrorControl {
     }
 }
 
-/// A struct that describes the service
+/// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceInfo {
     /// Service name
     pub name: OsString,
 
-    /// Friendly service name
+    /// User-friendly service name
     pub display_name: OsString,
 
+    /// The service type
     pub service_type: ServiceType,
+
+    /// The service startup options
     pub start_type: ServiceStartType,
+
+    /// The severity of the error, and action taken, if this service fails to start.
     pub error_control: ServiceErrorControl,
 
-    /// Path to the service binary.
+    /// Path to the service binary
     pub executable_path: PathBuf,
 
     /// Launch arguments passed to `main` when system starts the service.
@@ -139,7 +150,7 @@ pub struct ServiceInfo {
     pub account_password: Option<OsString>,
 }
 
-/// Enum describing the service control operations
+/// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceControl {
@@ -180,7 +191,7 @@ impl ServiceControl {
     }
 }
 
-/// Service state returned as a part of ServiceStatus
+/// Service state returned as a part of [`ServiceStatus`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceState {
@@ -215,12 +226,18 @@ impl ServiceState {
 
 /// Service exit code abstraction.
 ///
-/// This struct provides a logic around the relationship between `win32_exit_code` and
-/// `service_specific_exit_code`.
+/// This struct provides a logic around the relationship between [`dwWin32ExitCode`] and
+/// [`dwServiceSpecificExitCode`].
 ///
-/// The service can either return a win32 error code or a custom error
-/// code. In that case `win32_exit_code` has to be set to `ERROR_SERVICE_SPECIFIC_ERROR` and
-/// the `service_specific_exit_code` assigned with custom error code.
+/// The service can either return a win32 error code or a custom error code. In case of custom
+/// error, [`dwWin32ExitCode`] has to be set to [`ERROR_SERVICE_SPECIFIC_ERROR`] and the
+/// [`dwServiceSpecificExitCode`] assigned with custom error code.
+///
+/// Refer to the corresponding MSDN article for more info:\
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
+///
+/// [`dwWin32ExitCode`]: winsvc::SERVICE_STATUS::dwWin32ExitCode
+/// [`dwServiceSpecificExitCode`]: winsvc::SERVICE_STATUS::dwServiceSpecificExitCode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceExitCode {
     Win32(u32),
@@ -258,8 +275,8 @@ impl<'a> From<&'a winsvc::SERVICE_STATUS> for ServiceExitCode {
     }
 }
 
-/// Flags describing accepted types of service control requests
 bitflags! {
+    /// Flags describing accepted types of service control events.
     pub struct ServiceControlAccept: u32 {
         /// The service is a network component that can accept changes in its binding without being
         /// stopped and restarted. This allows service to receive `ServiceControl::Netbind*`
@@ -286,36 +303,45 @@ bitflags! {
 }
 
 /// Service status.
+///
+/// This struct wraps the lower level [`SERVICE_STATUS`] providing a few convenience types to fill
+/// in the service status information. However it doesn't fully guard the developer from producing
+/// an invalid `ServiceStatus`, therefore please refer to the corresponding MSDN article and in
+/// particular how to fill in the `exit_code`, `checkpoint`, `wait_hint` fields:\
+/// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
+///
+/// [`SERVICE_STATUS`]: winsvc::SERVICE_STATUS
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceStatus {
-    /// Type of service
+    /// Type of service.
     pub service_type: ServiceType,
 
-    /// Current state of the service
+    /// Current state of the service.
     pub current_state: ServiceState,
 
     /// Control commands that service accepts.
     pub controls_accepted: ServiceControlAccept,
 
-    /// Service exit code
+    /// The error code the service uses to report an error that occurs when it is starting or
+    /// stopping.
     pub exit_code: ServiceExitCode,
 
     /// Service initialization progress value that should be increased during a lengthy start,
-    /// stop, pause or continue eration. For example the service should increment the value as
+    /// stop, pause or continue operations. For example the service should increment the value as
     /// it completes each step of initialization.
     /// This value must be zero if the service does not have any pending start, stop, pause or
     /// continue operations.
     pub checkpoint: u32,
 
     /// Estimated time for pending operation.
-    /// This basically works as a timeout until the service manager assumes that the service hung.
-    /// This could be either circumvented by updating the `current_state` or incrementing a
-    /// `checkpoint` value.
+    /// This basically works as a timeout until the system assumes that the service hung.
+    /// This could be either circumvented by updating the [`ServiceStatus::current_state`] or
+    /// incrementing a [`ServiceStatus::checkpoint`] value.
     pub wait_hint: Duration,
 }
 
 impl ServiceStatus {
-    pub(super) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
+    pub(crate) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         raw_status.dwServiceType = self.service_type.to_raw();
         raw_status.dwCurrentState = self.current_state.to_raw();
@@ -345,22 +371,31 @@ impl ServiceStatus {
     }
 }
 
-
-pub struct Service(winsvc::SC_HANDLE);
+/// A struct that represents a system service.
+///
+/// The instances of the [`Service`] can be obtained via [`ServiceManager`].
+///
+/// [`ServiceManager`]: super::service_manager::ServiceManager
+pub struct Service {
+    service_handle: ScHandle,
+}
 
 impl Service {
-    /// Internal constructor
-    pub(super) unsafe fn from_handle(handle: winsvc::SC_HANDLE) -> Self {
-        Service(handle)
+    pub(crate) fn new(service_handle: ScHandle) -> Self {
+        Service { service_handle }
     }
 
+    /// Stop the service.
     pub fn stop(&self) -> Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Stop)
     }
 
+    /// Get the service status from the system.
     pub fn query_status(&self) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
-        let success = unsafe { winsvc::QueryServiceStatus(self.0, &mut raw_status) };
+        let success = unsafe {
+            winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
+        };
         if success == 1 {
             ServiceStatus::from_raw(raw_status)
         } else {
@@ -368,8 +403,9 @@ impl Service {
         }
     }
 
+    /// Delete the service from system registry.
     pub fn delete(self) -> io::Result<()> {
-        let success = unsafe { winsvc::DeleteService(self.0) };
+        let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
         if success == 1 {
             Ok(())
         } else {
@@ -377,20 +413,21 @@ impl Service {
         }
     }
 
+    /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
-        let success = unsafe { winsvc::ControlService(self.0, command.to_raw(), &mut raw_status) };
+        let success = unsafe {
+            winsvc::ControlService(
+                self.service_handle.raw_handle(),
+                command.to_raw(),
+                &mut raw_status,
+            )
+        };
 
         if success == 1 {
             ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
         } else {
             Err(io::Error::last_os_error().into())
         }
-    }
-}
-
-impl Drop for Service {
-    fn drop(&mut self) {
-        unsafe { winsvc::CloseServiceHandle(self.0) };
     }
 }

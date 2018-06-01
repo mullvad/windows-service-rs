@@ -5,65 +5,82 @@ use std::{io, ptr};
 use widestring::{NulError, WideCString, WideString};
 use winapi::um::winsvc;
 
+use sc_handle::ScHandle;
 use service::{Service, ServiceAccess, ServiceInfo};
 use shell_escape;
 
 mod errors {
     error_chain! {
         errors {
+            /// Invalid account name.
             InvalidAccountName {
                 description("Invalid account name")
             }
+            /// Invalid account password.
             InvalidAccountPassword {
                 description("Invalid account password")
             }
+            /// Invalid display name.
             InvalidDisplayName {
                 description("Invalid display name")
             }
+            /// Invalid database name.
             InvalidDatabaseName {
                 description("Invalid database name")
             }
+            /// Invalid executable path.
             InvalidExecutablePath {
                 description("Invalid executable path")
             }
+            /// Invalid launch arguments.
             InvalidLaunchArgument {
                 description("Invalid launch argument")
             }
+            /// Invalid machine name.
             InvalidMachineName {
                 description("Invalid machine name")
             }
+            /// Invalid service name.
             InvalidServiceName {
                 description("Invalid service name")
             }
         }
         foreign_links {
-            System(::std::io::Error);
+            System(::std::io::Error) #[doc = "System call error."];
         }
     }
 }
 pub use self::errors::*;
 
-/// Flags describing access permissions for ServiceManager
 bitflags! {
+    /// Flags describing access permissions for [`ServiceManager`].
     pub struct ServiceManagerAccess: u32 {
-        /// Can connect to service control manager
+        /// Can connect to service control manager.
         const CONNECT = winsvc::SC_MANAGER_CONNECT;
 
-        /// Can create services
+        /// Can create services.
         const CREATE_SERVICE = winsvc::SC_MANAGER_CREATE_SERVICE;
 
-        /// Can enumerate services
+        /// Can enumerate services or receive notifications.
         const ENUMERATE_SERVICE = winsvc::SC_MANAGER_ENUMERATE_SERVICE;
     }
 }
 
-/// Service control manager
-pub struct ServiceManager(winsvc::SC_HANDLE);
+/// Service manager.
+pub struct ServiceManager {
+    manager_handle: ScHandle,
+}
 
 impl ServiceManager {
-    /// Private initializer
-    /// Passing None for machine connects to local machine
-    /// Passing None for database connects to active database
+    /// Private initializer.
+    ///
+    /// # Arguments
+    ///
+    /// * `machine`  - The name of machine.
+    ///                Pass `None` to connect to local machine.
+    /// * `database` - The name of database to connect to.
+    ///                Pass `None` to connect to active database.
+    ///
     fn new<M: AsRef<OsStr>, D: AsRef<OsStr>>(
         machine: Option<M>,
         database: Option<D>,
@@ -82,11 +99,20 @@ impl ServiceManager {
         if handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(ServiceManager(handle))
+            Ok(ServiceManager {
+                manager_handle: unsafe { ScHandle::new(handle) },
+            })
         }
     }
 
-    /// Passing None for database connects to active database
+    /// Connect to local services database.
+    ///
+    /// # Arguments
+    ///
+    /// * `database`       - The name of database to connect to.
+    ///                      Pass `None` to connect to active database.
+    /// * `request_access` - Desired access permissions.
+    ///
     pub fn local_computer<D: AsRef<OsStr>>(
         database: Option<D>,
         request_access: ServiceManagerAccess,
@@ -94,7 +120,15 @@ impl ServiceManager {
         ServiceManager::new(None::<&OsStr>, database, request_access)
     }
 
-    /// Passing None for database connects to active database
+    /// Connect to remote services database.
+    ///
+    /// # Arguments
+    ///
+    /// * `machine`        - The name of remote machine.
+    /// * `database`       - The name of database to connect to.
+    ///                      Pass `None` to connect to active database.
+    /// * `request_access` - desired access permissions.
+    ///
     pub fn remote_computer<M: AsRef<OsStr>, D: AsRef<OsStr>>(
         machine: M,
         database: Option<D>,
@@ -103,6 +137,43 @@ impl ServiceManager {
         ServiceManager::new(Some(machine), database, request_access)
     }
 
+    /// Create a service.
+    ///
+    /// # Arguments
+    ///
+    /// * `service_info`   - The service information that will be saved to the system services
+    ///                      registry.
+    /// * `service_access` - Desired access permissions for the returned [`Service`]
+    ///                      instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use std::ffi::OsString;
+    /// use std::path::PathBuf;
+    /// use windows_service::service::{
+    ///     ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType,
+    /// };
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    /// let manager =
+    ///     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE).unwrap();
+    ///
+    /// let my_service_info = ServiceInfo {
+    ///     name: OsString::from("my_service"),
+    ///     display_name: OsString::from("My service"),
+    ///     service_type: ServiceType::OwnProcess,
+    ///     start_type: ServiceStartType::OnDemand,
+    ///     error_control: ServiceErrorControl::Normal,
+    ///     executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
+    ///     launch_arguments: vec![],
+    ///     account_name: None, // run as System
+    ///     account_password: None,
+    /// };
+    ///
+    /// let my_service = manager
+    ///     .create_service(my_service_info, ServiceAccess::QUERY_STATUS)
+    ///     .unwrap();
+    /// ```
     pub fn create_service(
         &self,
         service_info: ServiceInfo,
@@ -135,7 +206,7 @@ impl ServiceManager {
 
         let service_handle = unsafe {
             winsvc::CreateServiceW(
-                self.0,
+                self.manager_handle.raw_handle(),
                 service_name.as_ptr(),
                 display_name.as_ptr(),
                 service_access.bits(),
@@ -154,30 +225,49 @@ impl ServiceManager {
         if service_handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(unsafe { Service::from_handle(service_handle) })
+            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
     }
 
+    /// Open an existing service.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`           - The service name.
+    /// * `request_access` - Desired permissions for the returned [`Service`] instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service::ServiceAccess;
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// let manager =
+    ///     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).unwrap();
+    /// let my_service = manager
+    ///     .open_service("my_service", ServiceAccess::QUERY_STATUS)
+    ///     .unwrap();
+    /// ```
+    ///
     pub fn open_service<T: AsRef<OsStr>>(
         &self,
         name: T,
         request_access: ServiceAccess,
     ) -> Result<Service> {
         let service_name = WideCString::from_str(name).chain_err(|| ErrorKind::InvalidServiceName)?;
-        let service_handle =
-            unsafe { winsvc::OpenServiceW(self.0, service_name.as_ptr(), request_access.bits()) };
+        let service_handle = unsafe {
+            winsvc::OpenServiceW(
+                self.manager_handle.raw_handle(),
+                service_name.as_ptr(),
+                request_access.bits(),
+            )
+        };
 
         if service_handle.is_null() {
             Err(io::Error::last_os_error().into())
         } else {
-            Ok(unsafe { Service::from_handle(service_handle) })
+            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
-    }
-}
-
-impl Drop for ServiceManager {
-    fn drop(&mut self) {
-        unsafe { winsvc::CloseServiceHandle(self.0) };
     }
 }
 

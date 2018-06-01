@@ -1,0 +1,9 @@
+# Activation of features, almost objectively better ;)
+use_try_shorthand = true
+condense_wildcard_suffixes = true
+normalize_comments = true
+wrap_comments = true
+
+# Heavily subjective style choices
+comment_width = 100
+blank_lines_upper_bound = 2
