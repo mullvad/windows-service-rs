@@ -51,9 +51,6 @@
 //! The first thing that a windows service should do early in its lifecycle is to subscribe for
 //! service events such as stop or pause and many other.
 //!
-//! It's worth to mention that events are dispatched concurrently so it's important to make sure
-//! that your code is thread safe, the simplest way is to use [`std::sync::mpsc::channel`].
-//!
 //! ```rust,no_run
 //! extern crate windows_service;
 //!
