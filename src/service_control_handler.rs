@@ -102,7 +102,7 @@ impl ServiceControlHandlerResult {
 pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle>
 where
     S: AsRef<OsStr>,
-    F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static,
+    F: Fn(ServiceControl) -> ServiceControlHandlerResult + 'static + Send,
 {
     // Move closure data on heap.
     // The Box<HandlerFn> is a trait object and is stored on stack at this point.
