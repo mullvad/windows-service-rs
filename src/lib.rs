@@ -39,10 +39,11 @@
 //!     // `service_dispatcher::start` from `main`.
 //! }
 //!
-//! fn main() {
+//! fn main() -> Result<(), windows_service::Error> {
 //!     // Register generated `ffi_service_main` with the system and start the service, blocking
 //!     // this thread until the service is stopped.
-//!     service_dispatcher::start("myservice", ffi_service_main).unwrap();
+//!     service_dispatcher::start("myservice", ffi_service_main)?;
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -59,6 +60,12 @@
 //! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 //!
 //! fn my_service_main(arguments: Vec<OsString>) {
+//!     if let Err(_e) = run_service(arguments) {
+//!         // Handle errors in some way.
+//!     }
+//! }
+//!
+//! fn run_service(arguments: Vec<OsString>) -> Result<(), windows_service::Error> {
 //!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
 //!         match control_event {
 //!             ServiceControl::Stop => {
@@ -72,7 +79,8 @@
 //!     };
 //!
 //!     // Register system service event handler
-//!     let status_handle = service_control_handler::register("myservice", event_handler).unwrap();
+//!     let status_handle = service_control_handler::register("myservice", event_handler)?;
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -112,6 +120,12 @@
 //! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 //!
 //! fn my_service_main(arguments: Vec<OsString>) {
+//!     if let Err(_e) = run_service(arguments) {
+//!         // Handle error in some way.
+//!     }
+//! }
+//!
+//! fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
 //!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
 //!         match control_event {
 //!             ServiceControl::Stop | ServiceControl::Interrogate => {
@@ -122,8 +136,7 @@
 //!     };
 //!
 //!     // Register system service event handler
-//!     let status_handle =
-//!         service_control_handler::register("my_service_name", event_handler).unwrap();
+//!     let status_handle = service_control_handler::register("my_service_name", event_handler)?;
 //!
 //!     let next_status = ServiceStatus {
 //!         // Should match the one from system service registry
@@ -144,9 +157,9 @@
 //!     status_handle.set_service_status(next_status);
 //!
 //!     // Do some work
-//! }
 //!
-//! # fn main() {}
+//!     Ok(())
+//! }
 //! ```
 //!
 //! Please refer to the "Service State Transitions" article on MSDN for more info:\
