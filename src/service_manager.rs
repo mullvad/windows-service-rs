@@ -9,48 +9,7 @@ use sc_handle::ScHandle;
 use service::{Service, ServiceAccess, ServiceInfo};
 use shell_escape;
 
-mod errors {
-    error_chain! {
-        errors {
-            /// Invalid account name.
-            InvalidAccountName {
-                description("Invalid account name")
-            }
-            /// Invalid account password.
-            InvalidAccountPassword {
-                description("Invalid account password")
-            }
-            /// Invalid display name.
-            InvalidDisplayName {
-                description("Invalid display name")
-            }
-            /// Invalid database name.
-            InvalidDatabaseName {
-                description("Invalid database name")
-            }
-            /// Invalid executable path.
-            InvalidExecutablePath {
-                description("Invalid executable path")
-            }
-            /// Invalid launch arguments.
-            InvalidLaunchArgument {
-                description("Invalid launch argument")
-            }
-            /// Invalid machine name.
-            InvalidMachineName {
-                description("Invalid machine name")
-            }
-            /// Invalid service name.
-            InvalidServiceName {
-                description("Invalid service name")
-            }
-        }
-        foreign_links {
-            System(::std::io::Error) #[doc = "System call error."];
-        }
-    }
-}
-pub use self::errors::*;
+use {ErrorKind, Result, ResultExt};
 
 bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].

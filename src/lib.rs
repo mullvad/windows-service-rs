@@ -160,6 +160,9 @@
 
 #![cfg(windows)]
 
+// Because of how deeply error-chain recurse with this many error types.
+#![recursion_limit = "128"]
+
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
@@ -168,6 +171,62 @@ extern crate widestring;
 extern crate winapi;
 
 pub use error_chain::ChainedError;
+
+error_chain! {
+    errors {
+        /// Invalid account name.
+        InvalidAccountName {
+            description("Invalid account name")
+        }
+        /// Invalid account password.
+        InvalidAccountPassword {
+            description("Invalid account password")
+        }
+        /// Invalid display name.
+        InvalidDisplayName {
+            description("Invalid display name")
+        }
+        /// Invalid database name.
+        InvalidDatabaseName {
+            description("Invalid database name")
+        }
+        /// Invalid executable path.
+        InvalidExecutablePath {
+            description("Invalid executable path")
+        }
+        /// Invalid launch arguments.
+        InvalidLaunchArgument {
+            description("Invalid launch argument")
+        }
+        /// Invalid machine name.
+        InvalidMachineName {
+            description("Invalid machine name")
+        }
+        /// Invalid service name.
+        InvalidServiceName {
+            description("Invalid service name")
+        }
+
+        /// Invalid raw representation of [`ServiceType`].
+        InvalidServiceType(raw_value: u32) {
+            description("Invalid service type value")
+            display("Invalid service type value: {}", raw_value)
+        }
+        /// Invalid raw representation of [`ServiceState`].
+        InvalidServiceState(raw_value: u32) {
+            description("Invalid service state")
+            display("Invalid service state value: {}", raw_value)
+        }
+        /// Invalid raw representation of [`ServiceControl`].
+        InvalidServiceControl(raw_value: u32) {
+            description("Invalid service control")
+            display("Invalid service control value: {}", raw_value)
+        }
+    }
+    foreign_links {
+        System(::std::io::Error) #[doc = "System call error"];
+    }
+}
 
 mod sc_handle;
 pub mod service;

@@ -7,32 +7,7 @@ use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use sc_handle::ScHandle;
-
-mod errors {
-    error_chain! {
-        errors {
-            /// Invalid raw representation of [`ServiceType`].
-            InvalidServiceType(raw_value: u32) {
-                description("Invalid service type value")
-                display("Invalid service type value: {}", raw_value)
-            }
-            /// Invalid raw representation of [`ServiceState`].
-            InvalidServiceState(raw_value: u32) {
-                description("Invalid service state")
-                display("Invalid service state value: {}", raw_value)
-            }
-            /// Invalid raw representation of [`ServiceControl`].
-            InvalidServiceControl(raw_value: u32) {
-                description("Invalid service control")
-                display("Invalid service control value: {}", raw_value)
-            }
-        }
-        foreign_links {
-            System(::std::io::Error) #[doc = "System call error."];
-        }
-    }
-}
-pub use self::errors::*;
+use {ErrorKind, Result};
 
 /// Enum describing the types of Windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
