@@ -1,22 +1,10 @@
 use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
+
 use widestring::{WideCStr, WideCString};
 use winapi::um::winsvc;
 
-mod errors {
-    error_chain! {
-        errors {
-            /// Invalid service name.
-            InvalidServiceName {
-                description("Invalid service name")
-            }
-        }
-        foreign_links {
-            System(::std::io::Error) #[doc = "System call error."];
-        }
-    }
-}
-pub use self::errors::*;
+use {ErrorKind, Result, ResultExt};
 
 /// A macro to generate an entry point function (aka "service_main") for Windows service.
 ///
