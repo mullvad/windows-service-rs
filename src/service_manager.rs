@@ -114,24 +114,26 @@ impl ServiceManager {
     ///     ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType,
     /// };
     /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
-    /// let manager =
-    ///     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE).unwrap();
     ///
-    /// let my_service_info = ServiceInfo {
-    ///     name: OsString::from("my_service"),
-    ///     display_name: OsString::from("My service"),
-    ///     service_type: ServiceType::OwnProcess,
-    ///     start_type: ServiceStartType::OnDemand,
-    ///     error_control: ServiceErrorControl::Normal,
-    ///     executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
-    ///     launch_arguments: vec![],
-    ///     account_name: None, // run as System
-    ///     account_password: None,
-    /// };
+    /// fn main() -> windows_service::Result<()> {
+    ///     let manager =
+    ///         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE)?;
     ///
-    /// let my_service = manager
-    ///     .create_service(my_service_info, ServiceAccess::QUERY_STATUS)
-    ///     .unwrap();
+    ///     let my_service_info = ServiceInfo {
+    ///         name: OsString::from("my_service"),
+    ///         display_name: OsString::from("My service"),
+    ///         service_type: ServiceType::OwnProcess,
+    ///         start_type: ServiceStartType::OnDemand,
+    ///         error_control: ServiceErrorControl::Normal,
+    ///         executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
+    ///         launch_arguments: vec![],
+    ///         account_name: None, // run as System
+    ///         account_password: None,
+    ///     };
+    ///
+    ///     let my_service = manager.create_service(my_service_info, ServiceAccess::QUERY_STATUS)?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn create_service(
         &self,
@@ -201,11 +203,11 @@ impl ServiceManager {
     /// use windows_service::service::ServiceAccess;
     /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
     ///
-    /// let manager =
-    ///     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).unwrap();
-    /// let my_service = manager
-    ///     .open_service("my_service", ServiceAccess::QUERY_STATUS)
-    ///     .unwrap();
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::QUERY_STATUS)?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     pub fn open_service<T: AsRef<OsStr>>(

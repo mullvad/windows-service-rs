@@ -73,10 +73,11 @@ macro_rules! define_windows_service {
 ///     // `service_dispatcher::start` from `main`.
 /// }
 ///
-/// fn main() {
+/// fn main() -> windows_service::Result<()> {
 ///     // Register generated `ffi_service_main` with the system and start the service, blocking
 ///     // this thread until the service is stopped.
-///     service_dispatcher::start("myservice", ffi_service_main).unwrap();
+///     service_dispatcher::start("myservice", ffi_service_main)?;
+///     Ok(())
 /// }
 /// ```
 ///
