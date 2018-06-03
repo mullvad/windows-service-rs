@@ -2,28 +2,27 @@
 extern crate windows_service;
 
 #[cfg(windows)]
-fn main() {
+fn main() -> windows_service::Result<()> {
     use std::thread;
     use std::time::Duration;
     use windows_service::service::{ServiceAccess, ServiceState};
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
     let manager_access = ServiceManagerAccess::CONNECT;
-    let service_manager = ServiceManager::local_computer(None::<&str>, manager_access).unwrap();
+    let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
     let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-    let service = service_manager
-        .open_service("ping_service", service_access)
-        .unwrap();
+    let service = service_manager.open_service("ping_service", service_access)?;
 
-    let service_status = service.query_status().unwrap();
+    let service_status = service.query_status()?;
     if service_status.current_state != ServiceState::Stopped {
-        service.stop().unwrap();
+        service.stop()?;
         // Wait for service to stop
         thread::sleep(Duration::from_secs(1));
     }
 
-    service.delete().unwrap();
+    service.delete()?;
+    Ok(())
 }
 
 #[cfg(not(windows))]
