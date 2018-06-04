@@ -154,7 +154,7 @@
 //!     };
 //!
 //!     // Tell the system that the service is running now
-//!     status_handle.set_service_status(next_status);
+//!     status_handle.set_service_status(next_status)?;
 //!
 //!     // Do some work
 //!

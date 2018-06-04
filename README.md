@@ -148,7 +148,7 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
     };
 
     // Tell the system that the service is running now
-    status_handle.set_service_status(next_status);
+    status_handle.set_service_status(next_status)?;
 
     // Do some work
 
