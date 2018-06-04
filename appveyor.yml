@@ -22,10 +22,15 @@ environment:
     - TARGET: x86_64-pc-windows-msvc
 
     # Testing other channels
+    - TARGET: x86_64-pc-windows-msvc
+      RUST_VERSION: beta
     - TARGET: x86_64-pc-windows-gnu
       RUST_VERSION: nightly
     - TARGET: x86_64-pc-windows-msvc
       RUST_VERSION: nightly
+    # Testing on oldest supported version of Rust
+    - TARGET: x86_64-pc-windows-msvc
+      RUST_VERSION: 1.26.0
 
 install:
   - ps: >-
