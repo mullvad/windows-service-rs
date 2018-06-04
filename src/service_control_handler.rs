@@ -5,21 +5,7 @@ use winapi::shared::winerror::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR};
 use winapi::um::winsvc;
 
 use service::{ServiceControl, ServiceStatus};
-
-mod errors {
-    error_chain! {
-        errors {
-            /// Invalid service name.
-            InvalidServiceName {
-                description("Invalid service name")
-            }
-        }
-        foreign_links {
-            System(::std::io::Error) #[doc = "System call error."];
-        }
-    }
-}
-pub use self::errors::*;
+use {ErrorKind, Result, ResultExt};
 
 /// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]
@@ -86,15 +72,21 @@ impl ServiceControlHandlerResult {
 /// use windows_service::service::ServiceControl;
 /// use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 ///
-/// fn my_service_main(arguments: Vec<OsString>) {
+/// fn my_service_main(_arguments: Vec<OsString>) {
+///     if let Err(_e) = run_service() {
+///         // Handle errors...
+///     }
+/// }
+///
+/// fn run_service() -> windows_service::Result<()> {
 ///     let event_handler = move |control_event| -> ServiceControlHandlerResult {
 ///         match control_event {
 ///             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
 ///             _ => ServiceControlHandlerResult::NotImplemented,
 ///         }
 ///     };
-///     let status_handle =
-///         service_control_handler::register("my_service_name", event_handler).unwrap();
+///     let status_handle = service_control_handler::register("my_service_name", event_handler)?;
+///     Ok(())
 /// }
 ///
 /// # fn main() {}

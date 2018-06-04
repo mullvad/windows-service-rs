@@ -17,8 +17,8 @@
 extern crate windows_service;
 
 #[cfg(windows)]
-fn main() {
-    ping_service::run();
+fn main() -> windows_service::Result<()> {
+    ping_service::run()
 }
 
 #[cfg(not(windows))]
@@ -32,24 +32,27 @@ mod ping_service {
     use std::net::{IpAddr, SocketAddr, UdpSocket};
     use std::sync::mpsc;
     use std::time::Duration;
+
     use windows_service::service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     };
     use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
     use windows_service::service_dispatcher;
+    use windows_service::Result;
 
-    static SERVICE_NAME: &'static str = "ping_service";
-    static SERVICE_TYPE: ServiceType = ServiceType::OwnProcess;
 
-    static LOOPBACK_ADDR: [u8; 4] = [127, 0, 0, 1];
-    static RECEIVER_PORT: u16 = 1234;
-    static PING_MESSAGE: &'static str = "ping\n";
+    const SERVICE_NAME: &'static str = "ping_service";
+    const SERVICE_TYPE: ServiceType = ServiceType::OwnProcess;
 
-    pub fn run() {
+    const LOOPBACK_ADDR: [u8; 4] = [127, 0, 0, 1];
+    const RECEIVER_PORT: u16 = 1234;
+    const PING_MESSAGE: &'static str = "ping\n";
+
+    pub fn run() -> Result<()> {
         // Register generated `ffi_service_main` with the system and start the service, blocking
         // this thread until the service is stopped.
-        service_dispatcher::start(SERVICE_NAME, ffi_service_main).unwrap();
+        service_dispatcher::start(SERVICE_NAME, ffi_service_main)
     }
 
     // Generate the windows service boilerplate.
@@ -62,6 +65,12 @@ mod ping_service {
     // parameters. There is no stdout or stderr at this point so make sure to configure the log
     // output to file if needed.
     pub fn my_service_main(_arguments: Vec<OsString>) {
+        if let Err(_e) = run_service() {
+            // Handle the error, by logging or something.
+        }
+    }
+
+    pub fn run_service() -> Result<()> {
         // Create a channel to be able to poll a stop event from the service worker loop.
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
@@ -84,19 +93,17 @@ mod ping_service {
 
         // Register system service event handler.
         // The returned status handle should be used to report service status changes to the system.
-        let status_handle = service_control_handler::register(SERVICE_NAME, event_handler).unwrap();
+        let status_handle = service_control_handler::register(SERVICE_NAME, event_handler)?;
 
         // Tell the system that service is running
-        status_handle
-            .set_service_status(ServiceStatus {
-                service_type: SERVICE_TYPE,
-                current_state: ServiceState::Running,
-                controls_accepted: ServiceControlAccept::STOP,
-                exit_code: ServiceExitCode::Win32(0),
-                checkpoint: 0,
-                wait_hint: Duration::default(),
-            })
-            .unwrap();
+        status_handle.set_service_status(ServiceStatus {
+            service_type: SERVICE_TYPE,
+            current_state: ServiceState::Running,
+            controls_accepted: ServiceControlAccept::STOP,
+            exit_code: ServiceExitCode::Win32(0),
+            checkpoint: 0,
+            wait_hint: Duration::default(),
+        })?;
 
         // For demo purposes this service sends a UDP packet once a second.
         let loopback_ip = IpAddr::from(LOOPBACK_ADDR);
@@ -119,16 +126,16 @@ mod ping_service {
         }
 
         // Tell the system that service has stopped.
-        status_handle
-            .set_service_status(ServiceStatus {
-                service_type: SERVICE_TYPE,
-                current_state: ServiceState::Stopped,
-                controls_accepted: ServiceControlAccept::empty(),
-                exit_code: ServiceExitCode::Win32(0),
-                checkpoint: 0,
-                wait_hint: Duration::default(),
-            })
-            .unwrap();
+        status_handle.set_service_status(ServiceStatus {
+            service_type: SERVICE_TYPE,
+            current_state: ServiceState::Stopped,
+            controls_accepted: ServiceControlAccept::empty(),
+            exit_code: ServiceExitCode::Win32(0),
+            checkpoint: 0,
+            wait_hint: Duration::default(),
+        })?;
+
+        Ok(())
     }
 
 }
