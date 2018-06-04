@@ -172,7 +172,6 @@
 //! [`Running`]: service::ServiceState::Running
 
 #![cfg(windows)]
-
 // Because of how deeply error-chain recurse with this many error types.
 #![recursion_limit = "128"]
 
