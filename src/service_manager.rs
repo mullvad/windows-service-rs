@@ -127,6 +127,7 @@ impl ServiceManager {
     ///         error_control: ServiceErrorControl::Normal,
     ///         executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
     ///         launch_arguments: vec![],
+    ///         dependencies: vec![],
     ///         account_name: None, // run as System
     ///         account_password: None,
     ///     };
@@ -164,6 +165,13 @@ impl ServiceManager {
         }
 
         let launch_command = WideCString::from_wide_str(launch_command_buffer).unwrap();
+        let dependencies = to_double_nul_terminated(
+            service_info
+                .dependencies
+                .iter()
+                .map(|dependency| dependency.to_system_identifier())
+                .collect(),
+        ).chain_err(|| ErrorKind::InvalidDependency)?;
 
         let service_handle = unsafe {
             winsvc::CreateServiceW(
@@ -177,7 +185,7 @@ impl ServiceManager {
                 launch_command.as_ptr(),
                 ptr::null(),     // load ordering group
                 ptr::null_mut(), // tag id within the load ordering group
-                ptr::null(),     // service dependencies
+                dependencies.map_or(ptr::null(), |s| s.as_ptr()),
                 account_name.map_or(ptr::null(), |s| s.as_ptr()),
                 account_password.map_or(ptr::null(), |s| s.as_ptr()),
             )
@@ -235,6 +243,23 @@ impl ServiceManager {
 fn to_wide<T: AsRef<OsStr>>(s: Option<T>) -> ::std::result::Result<Option<WideCString>, NulError> {
     if let Some(s) = s {
         Ok(Some(WideCString::from_str(s)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// A helper to convert Vec<OsString> to double nul terminated WideString.
+/// Returns None if the source Vec is empty.
+fn to_double_nul_terminated<T: AsRef<OsStr>>(
+    source: Vec<T>,
+) -> ::std::result::Result<Option<WideString>, NulError> {
+    if source.len() > 0 {
+        let mut wide = WideString::new();
+        for s in source {
+            let checked_str = WideCString::from_str(s)?;
+            wide.push_slice(checked_str.into_vec_with_nul());
+        }
+        Ok(Some(wide))
     } else {
         Ok(None)
     }

@@ -210,6 +210,10 @@ error_chain! {
         InvalidLaunchArgument {
             description("Invalid launch argument")
         }
+        /// Invalid dependency name.
+        InvalidDependency {
+            description("Invalid dependency name")
+        }
         /// Invalid machine name.
         InvalidMachineName {
             description("Invalid machine name")
