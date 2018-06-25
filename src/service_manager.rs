@@ -186,9 +186,13 @@ impl ServiceManager {
                 launch_command.as_ptr(),
                 ptr::null(),     // load ordering group
                 ptr::null_mut(), // tag id within the load ordering group
-                joined_dependencies.map_or(ptr::null(), |s| s.as_ptr()),
-                account_name.map_or(ptr::null(), |s| s.as_ptr()),
-                account_password.map_or(ptr::null(), |s| s.as_ptr()),
+                joined_dependencies
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
+                account_name.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+                account_password
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
             )
         };
 
