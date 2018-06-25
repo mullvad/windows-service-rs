@@ -89,6 +89,28 @@ impl ServiceErrorControl {
         *self as u32
     }
 }
+/// Service dependency descriptor
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ServiceDependency {
+    Service(OsString),
+    Group(OsString),
+}
+
+impl ServiceDependency {
+    pub fn to_system_identifier(&self) -> OsString {
+        match *self {
+            ServiceDependency::Service(ref name) => name.to_owned(),
+            ServiceDependency::Group(ref name) => {
+                // since services and service groups share the same namespace the group identifiers
+                // should be prefixed with '+' (SC_GROUP_IDENTIFIER)
+                let mut group_identifier = OsString::new();
+                group_identifier.push("+");
+                group_identifier.push(name);
+                group_identifier
+            }
+        }
+    }
+}
 
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -114,6 +136,9 @@ pub struct ServiceInfo {
     /// Launch arguments passed to `main` when system starts the service.
     /// This is not the same as arguments passed to `service_main`.
     pub launch_arguments: Vec<OsString>,
+
+    /// Service dependencies
+    pub dependencies: Vec<ServiceDependency>,
 
     /// Account to use for running the service.
     /// for example: NT Authority\System.

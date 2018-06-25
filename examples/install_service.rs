@@ -27,6 +27,7 @@ fn main() -> windows_service::Result<()> {
         error_control: ServiceErrorControl::Normal,
         executable_path: service_binary_path,
         launch_arguments: vec![],
+        dependencies: vec![],
         account_name: None, // run as System
         account_password: None,
     };
