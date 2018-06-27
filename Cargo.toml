@@ -14,3 +14,8 @@ bitflags = "1.0.1"
 error-chain = "0.11"
 winapi = { version = "0.3", features = ["std", "winsvc", "winerror"] }
 widestring = "0.3.0"
+
+[features]
+default = ["backtrace", "error_chain_example_generated"]
+backtrace = ["error-chain/backtrace"]
+error_chain_example_generated = ["error-chain/example_generated"]
