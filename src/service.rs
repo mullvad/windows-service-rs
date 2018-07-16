@@ -245,6 +245,9 @@ pub enum ServiceExitCode {
 }
 
 impl ServiceExitCode {
+    /// A `ServiceExitCode` indicating success, no errors.
+    pub const NO_ERROR: Self = ServiceExitCode::Win32(NO_ERROR);
+
     fn copy_to(&self, raw_service_status: &mut winsvc::SERVICE_STATUS) {
         match *self {
             ServiceExitCode::Win32(win32_error_code) => {
@@ -261,7 +264,7 @@ impl ServiceExitCode {
 
 impl Default for ServiceExitCode {
     fn default() -> Self {
-        ServiceExitCode::Win32(NO_ERROR)
+        Self::NO_ERROR
     }
 }
 
