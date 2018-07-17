@@ -1,13 +1,14 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{io, mem};
 
+use widestring::WideCString;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use sc_handle::ScHandle;
-use {ErrorKind, Result};
+use {ErrorKind, Result, ResultExt};
 
 /// Enum describing the types of Windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -386,6 +387,46 @@ pub struct Service {
 impl Service {
     pub(crate) fn new(service_handle: ScHandle) -> Self {
         Service { service_handle }
+    }
+
+    /// Start the service.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use std::ffi::OsStr;
+    /// use windows_service::service::ServiceAccess;
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::START)?;
+    /// my_service.start(&[OsStr::new("Started from Rust!")])?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
+        let wide_service_arguments = service_arguments
+            .iter()
+            .map(|s| WideCString::from_str(s).chain_err(|| ErrorKind::InvalidStartArgument))
+            .collect::<Result<Vec<WideCString>>>()?;
+        let mut raw_service_arguments: Vec<*const u16> =
+            wide_service_arguments.iter().map(|s| s.as_ptr()).collect();
+
+        let success = unsafe {
+            winsvc::StartServiceW(
+                self.service_handle.raw_handle(),
+                raw_service_arguments.len() as u32,
+                raw_service_arguments.as_mut_ptr(),
+            )
+        };
+
+        if success == 1 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error().into())
+        }
     }
 
     /// Stop the service.

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Add support for specifying service dependencies when creating a service.
 - A `ServiceExitCode::NO_ERROR` constant for easy access to the success value.
+- Add `Service::start` for starting services programmatically.
 
 ### Changed
 - Changed `service_control_handler::register` to accept an `FnMut` rather than just an `Fn` for the
