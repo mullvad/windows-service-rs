@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
-- Add service dependencies.
+- Add support for specifying service dependencies when creating a service.
 - A `ServiceExitCode::NO_ERROR` constant for easy access to the success value.
 
 ### Fixed
