@@ -222,7 +222,10 @@ error_chain! {
         InvalidServiceName {
             description("Invalid service name")
         }
-
+        /// Invalid start argument.
+        InvalidStartArgument {
+            description("Invalid start argument")
+        }
         /// Invalid raw representation of [`ServiceType`].
         InvalidServiceType(raw_value: u32) {
             description("Invalid service type value")

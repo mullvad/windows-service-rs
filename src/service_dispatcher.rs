@@ -40,8 +40,16 @@ macro_rules! define_windows_service {
     ($function_name:ident, $service_main_handler:ident) => {
         /// Static callback used by the system to bootstrap the service.
         /// Do not call it directly.
-        extern "system" fn $function_name(argc: u32, argv: *mut *mut u16) {
-            let arguments = unsafe { $crate::service_dispatcher::parse_raw_arguments(argc, argv) };
+        extern "system" fn $function_name(
+            num_service_arguments: u32,
+            service_arguments: *mut *mut u16,
+        ) {
+            let arguments = unsafe {
+                $crate::service_dispatcher::parse_service_arguments(
+                    num_service_arguments,
+                    service_arguments,
+                )
+            };
 
             $service_main_handler(arguments);
         }
@@ -111,7 +119,7 @@ pub fn start<T: AsRef<OsStr>>(
 ///
 /// This is an implementation detail and *should not* be called directly!
 #[doc(hidden)]
-pub unsafe fn parse_raw_arguments(argc: u32, argv: *mut *mut u16) -> Vec<OsString> {
+pub unsafe fn parse_service_arguments(argc: u32, argv: *mut *mut u16) -> Vec<OsString> {
     (0..argc)
         .into_iter()
         .map(|i| {
