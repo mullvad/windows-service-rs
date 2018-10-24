@@ -546,11 +546,6 @@ impl Service {
                 unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
             ServiceInfo::from_raw(raw_config)
         } else {
-            println!(
-                "size needed {} vs {} allocated",
-                bytes_needed,
-                mem::size_of::<winsvc::QUERY_SERVICE_CONFIGW>()
-            );
             Err(io::Error::last_os_error().into())
         }
     }
