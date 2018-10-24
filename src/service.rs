@@ -520,15 +520,14 @@ impl Service {
         }
     }
 
-    /// Get the service status from the system.
+    /// Get the service config from the system.
     pub fn query_config(&self) -> Result<ServiceInfo> {
-        let mut raw_config = unsafe { mem::zeroed::<winsvc::QUERY_SERVICE_CONFIGW>() };
         let mut data: Vec<u8>;
         let mut bytes_needed: u32 = 0;
         unsafe {
             winsvc::QueryServiceConfigW(
                 self.service_handle.raw_handle(),
-                &mut raw_config,
+                ::std::ptr::null_mut(),
                 mem::size_of::<winsvc::QUERY_SERVICE_CONFIGW>() as u32,
                 &mut bytes_needed,
             )
@@ -543,7 +542,8 @@ impl Service {
             )
         };
         if success == 1 {
-            raw_config = unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
+            let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
+                unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
             ServiceInfo::from_raw(raw_config)
         } else {
             println!(
