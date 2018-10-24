@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{io, mem};
 
-use widestring::WideCString;
-use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
+use widestring::{WideCStr, WideCString};
+use winapi::shared::ntdef::LPWSTR;
+use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use sc_handle::ScHandle;
@@ -14,14 +15,26 @@ use {ErrorKind, Result, ResultExt};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceType {
+    /// File system driver service.
+    FileSystemDriver = winnt::SERVICE_FILE_SYSTEM_DRIVER,
+
+    /// Driver service.
+    KernelDriver = winnt::SERVICE_KERNEL_DRIVER,
+
     /// Service that runs in its own process.
     OwnProcess = winnt::SERVICE_WIN32_OWN_PROCESS,
+
+    /// Service that shares a process with other services.
+    ShareProcess = winnt::SERVICE_WIN32_SHARE_PROCESS,
 }
 
 impl ServiceType {
     pub fn from_raw(raw_value: u32) -> Result<Self> {
         let service_type = match raw_value {
+            x if x == ServiceType::FileSystemDriver.to_raw() => ServiceType::FileSystemDriver,
+            x if x == ServiceType::KernelDriver.to_raw() => ServiceType::KernelDriver,
             x if x == ServiceType::OwnProcess.to_raw() => ServiceType::OwnProcess,
+            x if x == ServiceType::ShareProcess.to_raw() => ServiceType::ShareProcess,
             _ => Err(ErrorKind::InvalidServiceType(raw_value))?,
         };
         Ok(service_type)
@@ -41,7 +54,7 @@ bitflags! {
         /// Can start the service
         const START = winsvc::SERVICE_START;
 
-        // Can stop the service
+        /// Can stop the service
         const STOP = winsvc::SERVICE_STOP;
 
         /// Can pause or continue the service execution
@@ -52,6 +65,9 @@ bitflags! {
 
         /// Can delete the service
         const DELETE = winnt::DELETE;
+
+        /// Can query the services configuration
+        const QUERY_CONFIG = winsvc::SERVICE_QUERY_CONFIG;
     }
 }
 
@@ -71,6 +87,15 @@ impl ServiceStartType {
     pub fn to_raw(&self) -> u32 {
         *self as u32
     }
+
+    pub fn from_raw(raw: u32) -> Result<ServiceStartType> {
+        match raw {
+            x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
+            x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
+            x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
+            _ => Err(ErrorKind::InvalidServiceStartType(raw))?,
+        }
+    }
 }
 
 /// Error handling strategy for service failures.
@@ -89,7 +114,18 @@ impl ServiceErrorControl {
     pub fn to_raw(&self) -> u32 {
         *self as u32
     }
+
+    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl> {
+        match raw {
+            x if x == ServiceErrorControl::Critical.to_raw() => Ok(ServiceErrorControl::Critical),
+            x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
+            x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
+            x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
+            _ => Err(ErrorKind::InvalidServiceErrorControl(raw))?,
+        }
+    }
 }
+
 /// Service dependency descriptor
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ServiceDependency {
@@ -149,6 +185,100 @@ pub struct ServiceInfo {
     /// Account password.
     /// For system accounts this should normally be `None`.
     pub account_password: Option<OsString>,
+}
+
+/// A struct that describes the service.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServiceConfig {
+    /// The service type
+    pub service_type: ServiceType,
+
+    /// The service startup options
+    pub start_type: ServiceStartType,
+
+    /// The severity of the error, and action taken, if this service fails to start.
+    pub error_control: ServiceErrorControl,
+
+    /// Path to the service binary
+    pub executable_path: PathBuf,
+
+    /// Path to the service binary
+    pub load_order_group: Option<OsString>,
+
+    /// A unique tag value for this service in the group specified by the load_order_group
+    /// parameter.
+    pub tag_id: u32,
+
+    /// Service dependencies
+    pub dependencies: Option<Vec<ServiceDependency>>,
+
+    /// Account to use for running the service.
+    /// for example: NT Authority\System.
+    /// use `None` to run as LocalSystem.
+    pub account_name: Option<OsString>,
+
+    /// User-friendly service name
+    pub display_name: OsString,
+}
+
+impl ServiceConfig {
+    pub fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig> {
+        Ok(ServiceConfig {
+            service_type: ServiceType::from_raw(raw.dwServiceType)?,
+            start_type: ServiceStartType::from_raw(raw.dwStartType)?,
+            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
+            executable_path: PathBuf::from(
+                unsafe { WideCStr::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
+            ),
+            load_order_group: {
+                match raw.lpLoadOrderGroup {
+                    i if i == ::std::ptr::null_mut() => None,
+                    _ => {
+                        let value =
+                            unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }.to_os_string();
+                        match value.len() {
+                            0 => None,
+                            _ => Some(value),
+                        }
+                    }
+                }
+            },
+            tag_id: raw.dwTagId,
+            dependencies: ServiceConfig::array_string_to_vec(raw.lpDependencies),
+            account_name: Some(
+                unsafe { WideCStr::from_ptr_str(raw.lpServiceStartName) }.to_os_string(),
+            ),
+            display_name: unsafe { WideCStr::from_ptr_str(raw.lpDisplayName) }.to_os_string(),
+        })
+    }
+
+    fn array_string_to_vec(input: LPWSTR) -> Option<Vec<ServiceDependency>> {
+        let mut next = input;
+        let mut deps = Vec::new();
+        while {
+            match next {
+                i if i == ::std::ptr::null_mut() => false,
+                _ => match unsafe { WideCStr::from_ptr_str(next) }.to_string() {
+                    Ok(value) => match value.len() {
+                        i if i > 0 => {
+                            next = (next as usize + (value.len() * 2 + 2)) as LPWSTR;
+                            match value.starts_with("+") {
+                                true => deps.push(ServiceDependency::Group(value.into())),
+                                _ => deps.push(ServiceDependency::Service(value.into())),
+                            }
+                            true
+                        }
+                        _ => false,
+                    },
+                    Err(_) => false,
+                },
+            }
+        } {}
+        match deps.len() {
+            0 => None,
+            _ => Some(deps),
+        }
+    }
 }
 
 /// Enum describing the service control operations.
@@ -472,6 +602,50 @@ impl Service {
             ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
         } else {
             Err(io::Error::last_os_error().into())
+        }
+    }
+
+    /// Query service config and convert to ServiceConfig
+    fn query_service_config(&self, mut size: u32) -> Result<ServiceConfig> {
+        let mut data = vec![0; size as usize];
+        match unsafe {
+            winsvc::QueryServiceConfigW(
+                self.service_handle.raw_handle(),
+                data.as_mut_ptr() as _,
+                data.len() as u32,
+                &mut size,
+            )
+        } {
+            0 => Err(io::Error::last_os_error().into()),
+            _ => {
+                let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
+                    unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
+                ServiceConfig::from_raw(raw_config)
+            }
+        }
+    }
+
+    /// Get the service config from the system.
+    pub fn query_config(&self) -> Result<ServiceConfig> {
+        let mut bytes_needed: u32 = 0;
+        match unsafe {
+            winsvc::QueryServiceConfigW(
+                self.service_handle.raw_handle(),
+                ::std::ptr::null_mut() as _,
+                0,
+                &mut bytes_needed,
+            )
+        } {
+            0 => match io::Error::last_os_error().raw_os_error() {
+                Some(e) => match e {
+                    i if i == ERROR_INSUFFICIENT_BUFFER as i32 => {
+                        self.query_service_config(bytes_needed)
+                    }
+                    _ => Err(io::Error::last_os_error().into()),
+                },
+                None => Err(io::Error::last_os_error().into()),
+            },
+            _ => self.query_service_config(bytes_needed),
         }
     }
 }

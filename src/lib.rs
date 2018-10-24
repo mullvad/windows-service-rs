@@ -241,6 +241,16 @@ error_chain! {
             description("Invalid service control")
             display("Invalid service control value: {}", raw_value)
         }
+        /// Invalid raw representation of [`ServiceStartType`].
+        InvalidServiceStartType(raw_value: u32) {
+            description("Invalid service start type")
+            display("Invalid service start type: {}", raw_value)
+        }
+        /// Invalid raw representation of [`ServiceErrorControl`].
+        InvalidServiceErrorControl(raw_value: u32) {
+            description("Invalid service error control type")
+            display("Invalid service error control type: {}", raw_value)
+        }
     }
     foreign_links {
         System(::std::io::Error) #[doc = "System call error"];
