@@ -52,6 +52,8 @@ bitflags! {
 
         /// Can delete the service
         const DELETE = winnt::DELETE;
+
+        const QUERY_CONFIG = 0x0001;
     }
 }
 
@@ -71,6 +73,15 @@ impl ServiceStartType {
     pub fn to_raw(&self) -> u32 {
         *self as u32
     }
+
+    pub fn from_raw(raw: u32) -> Result<ServiceStartType> {
+        match raw {
+            winnt::SERVICE_AUTO_START => Ok(ServiceStartType::AutoStart),
+            winnt::SERVICE_DEMAND_START => Ok(ServiceStartType::OnDemand),
+            winnt::SERVICE_DISABLED => Ok(ServiceStartType::Disabled),
+            _ => Err(ErrorKind::InvalidServiceStartType(raw))?,
+        }
+    }
 }
 
 /// Error handling strategy for service failures.
@@ -89,7 +100,18 @@ impl ServiceErrorControl {
     pub fn to_raw(&self) -> u32 {
         *self as u32
     }
+
+    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl> {
+        match raw {
+            winnt::SERVICE_ERROR_CRITICAL => Ok(ServiceErrorControl::Critical),
+            winnt::SERVICE_ERROR_IGNORE => Ok(ServiceErrorControl::Ignore),
+            winnt::SERVICE_ERROR_NORMAL => Ok(ServiceErrorControl::Normal),
+            winnt::SERVICE_ERROR_SEVERE => Ok(ServiceErrorControl::Severe),
+            _ => Err(ErrorKind::InvalidServiceErrorControl(raw))?,
+        }
+    }
 }
+
 /// Service dependency descriptor
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ServiceDependency {
@@ -149,6 +171,29 @@ pub struct ServiceInfo {
     /// Account password.
     /// For system accounts this should normally be `None`.
     pub account_password: Option<OsString>,
+}
+
+impl ServiceInfo {
+    pub fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceInfo> {
+        Ok(ServiceInfo {
+            name: OsString::from(""),
+            display_name: OsString::from(
+                unsafe { WideCString::from_ptr_str(raw.lpDisplayName) }.to_string_lossy(),
+            ),
+            service_type: ServiceType::from_raw(raw.dwServiceType)?,
+            start_type: ServiceStartType::from_raw(raw.dwStartType)?,
+            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
+            executable_path: PathBuf::from(
+                unsafe { WideCString::from_ptr_str(raw.lpBinaryPathName) }.to_string_lossy(),
+            ),
+            launch_arguments: vec![],
+            dependencies: vec![],
+            account_name: Some(OsString::from(
+                unsafe { WideCString::from_ptr_str(raw.lpServiceStartName) }.to_string_lossy(),
+            )),
+            account_password: None,
+        })
+    }
 }
 
 /// Enum describing the service control operations.
@@ -471,6 +516,41 @@ impl Service {
         if success == 1 {
             ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
         } else {
+            Err(io::Error::last_os_error().into())
+        }
+    }
+
+    /// Get the service status from the system.
+    pub fn query_config(&self) -> Result<ServiceInfo> {
+        let mut raw_config = unsafe { mem::zeroed::<winsvc::QUERY_SERVICE_CONFIGW>() };
+        let mut data: Vec<u8>;
+        let mut bytes_needed: u32 = 0;
+        unsafe {
+            winsvc::QueryServiceConfigW(
+                self.service_handle.raw_handle(),
+                &mut raw_config,
+                mem::size_of::<winsvc::QUERY_SERVICE_CONFIGW>() as u32,
+                &mut bytes_needed,
+            )
+        };
+        let success = unsafe {
+            data = vec![0; bytes_needed as usize];
+            winsvc::QueryServiceConfigW(
+                self.service_handle.raw_handle(),
+                data.as_mut_ptr() as _,
+                data.len() as u32,
+                &mut bytes_needed,
+            )
+        };
+        if success == 1 {
+            raw_config = unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
+            ServiceInfo::from_raw(raw_config)
+        } else {
+            println!(
+                "size needed {} vs {} allocated",
+                bytes_needed,
+                mem::size_of::<winsvc::QUERY_SERVICE_CONFIGW>()
+            );
             Err(io::Error::last_os_error().into())
         }
     }
