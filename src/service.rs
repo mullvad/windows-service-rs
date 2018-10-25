@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
+use winapi::shared::ntdef::LPWSTR;
 use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
@@ -202,14 +203,14 @@ pub struct ServiceConfig {
     pub executable_path: PathBuf,
 
     /// Path to the service binary
-    pub load_order_group: OsString,
+    pub load_order_group: Option<OsString>,
 
     /// A unique tag value for this service in the group specified by the load_order_group
     /// parameter.
     pub tag_id: u32,
 
     /// Service dependencies
-    pub dependencies: Vec<ServiceDependency>,
+    pub dependencies: Option<Vec<ServiceDependency>>,
 
     /// Account to use for running the service.
     /// for example: NT Authority\System.
@@ -229,15 +230,45 @@ impl ServiceConfig {
             executable_path: PathBuf::from(
                 unsafe { WideCStr::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
             ),
-            load_order_group: unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }
-                .to_os_string(),
+            load_order_group: {
+                let value = unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }.to_os_string();
+                match value.len() {
+                    0 => None,
+                    _ => Some(value),
+                }
+            },
             tag_id: raw.dwTagId,
-            dependencies: vec![],
+            dependencies: ServiceConfig::array_string_to_vec(raw.lpDependencies),
             account_name: Some(
                 unsafe { WideCStr::from_ptr_str(raw.lpServiceStartName) }.to_os_string(),
             ),
             display_name: unsafe { WideCStr::from_ptr_str(raw.lpDisplayName) }.to_os_string(),
         })
+    }
+
+    fn array_string_to_vec(input: LPWSTR) -> Option<Vec<ServiceDependency>> {
+        let mut next = input;
+        let mut deps = Vec::new();
+        while {
+            match unsafe { WideCStr::from_ptr_str(next) }.to_string() {
+                Ok(value) => match value.len() {
+                    i if i > 0 => {
+                        next = (next as usize + (value.len() * 2 + 2)) as LPWSTR;
+                        match value.starts_with("+") {
+                            true => deps.push(ServiceDependency::Group(value.into())),
+                            _ => deps.push(ServiceDependency::Service(value.into())),
+                        }
+                        true
+                    }
+                    _ => false,
+                },
+                Err(_) => false,
+            }
+        } {}
+        match deps.len() {
+            0 => None,
+            _ => Some(deps),
+        }
     }
 }
 
