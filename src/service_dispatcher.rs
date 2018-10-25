@@ -34,7 +34,6 @@ use {ErrorKind, Result, ResultExt};
 ///
 /// # fn main() {}
 /// ```
-///
 #[macro_export]
 macro_rules! define_windows_service {
     ($function_name:ident, $service_main_handler:ident) => {
@@ -88,7 +87,6 @@ macro_rules! define_windows_service {
 ///     Ok(())
 /// }
 /// ```
-///
 pub fn start<T: AsRef<OsStr>>(
     service_name: T,
     service_main: extern "system" fn(u32, *mut *mut u16),

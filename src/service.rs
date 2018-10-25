@@ -405,7 +405,6 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    ///
     pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
