@@ -55,6 +55,54 @@ macro_rules! define_windows_service {
     };
 }
 
+
+/// A signature for `service_main` function
+type ServiceEntryProc = extern "system" fn(u32, *mut *mut u16);
+
+
+/// A struct that describes service entries table
+pub struct ServiceTable {
+    pub entries: Vec<ServiceEntry>,
+}
+
+impl ServiceTable {
+    pub fn to_raw(&self) -> Vec<winsvc::SERVICE_TABLE_ENTRYW> {
+        let mut service_table: Vec<winsvc::SERVICE_TABLE_ENTRYW> =
+            self.entries.iter().map(|entry| entry.to_raw()).collect();
+
+        // the last item has to be { null, null }
+        service_table.push(winsvc::SERVICE_TABLE_ENTRYW {
+            lpServiceName: ptr::null(),
+            lpServiceProc: None,
+        });
+
+        service_table
+    }
+}
+
+/// A struct that describes service entry
+pub struct ServiceEntry {
+    service_name: WideCString,
+    service_main: ServiceEntryProc,
+}
+
+impl ServiceEntry {
+    pub fn new<T: AsRef<OsStr>>(service_name: T, service_main: ServiceEntryProc) -> Result<Self> {
+        Ok(ServiceEntry {
+            service_name: WideCString::from_str(service_name)
+                .chain_err(|| ErrorKind::InvalidServiceName)?,
+            service_main,
+        })
+    }
+
+    pub fn to_raw(&self) -> winsvc::SERVICE_TABLE_ENTRYW {
+        winsvc::SERVICE_TABLE_ENTRYW {
+            lpServiceName: self.service_name.as_ptr(),
+            lpServiceProc: Some(self.service_main),
+        }
+    }
+}
+
 /// Start service control dispatcher.
 ///
 /// Once started the service control dispatcher blocks the current thread execution
@@ -87,10 +135,7 @@ macro_rules! define_windows_service {
 ///     Ok(())
 /// }
 /// ```
-pub fn start<T: AsRef<OsStr>>(
-    service_name: T,
-    service_main: extern "system" fn(u32, *mut *mut u16),
-) -> Result<()> {
+pub fn start<T: AsRef<OsStr>>(service_name: T, service_main: ServiceEntryProc) -> Result<()> {
     let service_name =
         WideCString::from_str(service_name).chain_err(|| ErrorKind::InvalidServiceName)?;
     let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[
@@ -106,6 +151,16 @@ pub fn start<T: AsRef<OsStr>>(
     ];
 
     let result = unsafe { winsvc::StartServiceCtrlDispatcherW(service_table.as_ptr()) };
+    if result == 0 {
+        Err(io::Error::last_os_error().into())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn start_shared(service_table: &ServiceTable) -> Result<()> {
+    let raw_service_table = service_table.to_raw();
+    let result = unsafe { winsvc::StartServiceCtrlDispatcherW(raw_service_table.as_ptr()) };
     if result == 0 {
         Err(io::Error::last_os_error().into())
     } else {
