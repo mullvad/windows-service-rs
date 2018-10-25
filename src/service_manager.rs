@@ -35,11 +35,9 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `machine`  - The name of machine.
-    ///                Pass `None` to connect to local machine.
-    /// * `database` - The name of database to connect to.
-    ///                Pass `None` to connect to active database.
-    ///
+    /// * `machine` - The name of machine. Pass `None` to connect to local machine.
+    /// * `database` - The name of database to connect to. Pass `None` to connect to active
+    ///   database.
     fn new<M: AsRef<OsStr>, D: AsRef<OsStr>>(
         machine: Option<M>,
         database: Option<D>,
@@ -68,10 +66,9 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `database`       - The name of database to connect to.
-    ///                      Pass `None` to connect to active database.
+    /// * `database` - The name of database to connect to. Pass `None` to connect to active
+    ///   database.
     /// * `request_access` - Desired access permissions.
-    ///
     pub fn local_computer<D: AsRef<OsStr>>(
         database: Option<D>,
         request_access: ServiceManagerAccess,
@@ -83,11 +80,10 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `machine`        - The name of remote machine.
-    /// * `database`       - The name of database to connect to.
-    ///                      Pass `None` to connect to active database.
+    /// * `machine` - The name of remote machine.
+    /// * `database` - The name of database to connect to. Pass `None` to connect to active
+    ///   database.
     /// * `request_access` - desired access permissions.
-    ///
     pub fn remote_computer<M: AsRef<OsStr>, D: AsRef<OsStr>>(
         machine: M,
         database: Option<D>,
@@ -100,10 +96,9 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `service_info`   - The service information that will be saved to the system services
-    ///                      registry.
-    /// * `service_access` - Desired access permissions for the returned [`Service`]
-    ///                      instance.
+    /// * `service_info` - The service information that will be saved to the system services
+    ///   registry.
+    /// * `service_access` - Desired access permissions for the returned [`Service`] instance.
     ///
     /// # Example
     ///
@@ -147,8 +142,8 @@ impl ServiceManager {
             .chain_err(|| ErrorKind::InvalidDisplayName)?;
         let account_name =
             to_wide(service_info.account_name).chain_err(|| ErrorKind::InvalidAccountName)?;
-        let account_password =
-            to_wide(service_info.account_password).chain_err(|| ErrorKind::InvalidAccountPassword)?;
+        let account_password = to_wide(service_info.account_password)
+            .chain_err(|| ErrorKind::InvalidAccountPassword)?;
 
         // escape executable path and arguments and combine them into single command
         let executable_path = escape_wide(service_info.executable_path)
@@ -158,7 +153,8 @@ impl ServiceManager {
         launch_command_buffer.push(executable_path);
 
         for launch_argument in service_info.launch_arguments.iter() {
-            let wide = escape_wide(launch_argument).chain_err(|| ErrorKind::InvalidLaunchArgument)?;
+            let wide =
+                escape_wide(launch_argument).chain_err(|| ErrorKind::InvalidLaunchArgument)?;
 
             launch_command_buffer.push_str(" ");
             launch_command_buffer.push(wide);
@@ -207,7 +203,7 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `name`           - The service name.
+    /// * `name` - The service name.
     /// * `request_access` - Desired permissions for the returned [`Service`] instance.
     ///
     /// # Example
@@ -222,13 +218,13 @@ impl ServiceManager {
     /// # Ok(())
     /// # }
     /// ```
-    ///
     pub fn open_service<T: AsRef<OsStr>>(
         &self,
         name: T,
         request_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name = WideCString::from_str(name).chain_err(|| ErrorKind::InvalidServiceName)?;
+        let service_name =
+            WideCString::from_str(name).chain_err(|| ErrorKind::InvalidServiceName)?;
         let service_handle = unsafe {
             winsvc::OpenServiceW(
                 self.manager_handle.raw_handle(),
