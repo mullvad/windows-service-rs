@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{io, mem};
 
-use widestring::WideCString;
+use widestring::{WideCStr, WideCString};
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
@@ -227,16 +227,16 @@ impl ServiceConfig {
             start_type: ServiceStartType::from_raw(raw.dwStartType)?,
             error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
             executable_path: PathBuf::from(
-                unsafe { WideCString::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
+                unsafe { WideCStr::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
             ),
-            load_order_group: unsafe { WideCString::from_ptr_str(raw.lpLoadOrderGroup) }
+            load_order_group: unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }
                 .to_os_string(),
             tag_id: raw.dwTagId,
             dependencies: vec![],
             account_name: Some(
-                unsafe { WideCString::from_ptr_str(raw.lpServiceStartName) }.to_os_string(),
+                unsafe { WideCStr::from_ptr_str(raw.lpServiceStartName) }.to_os_string(),
             ),
-            display_name: unsafe { WideCString::from_ptr_str(raw.lpDisplayName) }.to_os_string(),
+            display_name: unsafe { WideCStr::from_ptr_str(raw.lpDisplayName) }.to_os_string(),
         })
     }
 }
