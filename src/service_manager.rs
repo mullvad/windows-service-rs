@@ -35,7 +35,7 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `machine`  - The name of machine. Pass `None` to connect to local machine.
+    /// * `machine` - The name of machine. Pass `None` to connect to local machine.
     /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
     fn new<M: AsRef<OsStr>, D: AsRef<OsStr>>(
@@ -66,7 +66,7 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `database`       - The name of database to connect to. Pass `None` to connect to active
+    /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
     /// * `request_access` - Desired access permissions.
     pub fn local_computer<D: AsRef<OsStr>>(
@@ -80,8 +80,8 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `machine`        - The name of remote machine.
-    /// * `database`       - The name of database to connect to. Pass `None` to connect to active
+    /// * `machine` - The name of remote machine.
+    /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
     /// * `request_access` - desired access permissions.
     pub fn remote_computer<M: AsRef<OsStr>, D: AsRef<OsStr>>(
@@ -96,9 +96,9 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `service_info`   - The service information that will be saved to the system services
+    /// * `service_info` - The service information that will be saved to the system services
     ///   registry.
-    /// * `service_access` - Desired access permissions for the returned [`Service`]   instance.
+    /// * `service_access` - Desired access permissions for the returned [`Service`] instance.
     ///
     /// # Example
     ///
@@ -203,7 +203,7 @@ impl ServiceManager {
     ///
     /// # Arguments
     ///
-    /// * `name`           - The service name.
+    /// * `name` - The service name.
     /// * `request_access` - Desired permissions for the returned [`Service`] instance.
     ///
     /// # Example
