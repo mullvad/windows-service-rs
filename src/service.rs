@@ -14,14 +14,26 @@ use {ErrorKind, Result, ResultExt};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceType {
+    /// File system driver service.
+    FileSystemDriver = winnt::SERVICE_FILE_SYSTEM_DRIVER,
+
+    /// Driver service.
+    KernelDriver = winnt::SERVICE_KERNEL_DRIVER,
+
     /// Service that runs in its own process.
     OwnProcess = winnt::SERVICE_WIN32_OWN_PROCESS,
+
+    /// Service that shares a process with other services.
+    ShareProcess = winnt::SERVICE_WIN32_SHARE_PROCESS,
 }
 
 impl ServiceType {
     pub fn from_raw(raw_value: u32) -> Result<Self> {
         let service_type = match raw_value {
+            x if x == ServiceType::FileSystemDriver.to_raw() => ServiceType::FileSystemDriver,
+            x if x == ServiceType::KernelDriver.to_raw() => ServiceType::KernelDriver,
             x if x == ServiceType::OwnProcess.to_raw() => ServiceType::OwnProcess,
+            x if x == ServiceType::ShareProcess.to_raw() => ServiceType::ShareProcess,
             _ => Err(ErrorKind::InvalidServiceType(raw_value))?,
         };
         Ok(service_type)
@@ -41,7 +53,7 @@ bitflags! {
         /// Can start the service
         const START = winsvc::SERVICE_START;
 
-        // Can stop the service
+        /// Can stop the service
         const STOP = winsvc::SERVICE_STOP;
 
         /// Can pause or continue the service execution
@@ -53,7 +65,8 @@ bitflags! {
         /// Can delete the service
         const DELETE = winnt::DELETE;
 
-        const QUERY_CONFIG = 0x0001;
+        /// Can query the services configuration
+        const QUERY_CONFIG = winsvc::SERVICE_QUERY_CONFIG;
     }
 }
 
@@ -173,25 +186,57 @@ pub struct ServiceInfo {
     pub account_password: Option<OsString>,
 }
 
-impl ServiceInfo {
-    pub fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceInfo> {
-        Ok(ServiceInfo {
-            name: OsString::from(""),
-            display_name: OsString::from(
-                unsafe { WideCString::from_ptr_str(raw.lpDisplayName) }.to_string_lossy(),
-            ),
+/// A struct that describes the service.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServiceConfig {
+    /// The service type
+    pub service_type: ServiceType,
+
+    /// The service startup options
+    pub start_type: ServiceStartType,
+
+    /// The severity of the error, and action taken, if this service fails to start.
+    pub error_control: ServiceErrorControl,
+
+    /// Path to the service binary
+    pub executable_path: PathBuf,
+
+    /// Path to the service binary
+    pub load_order_group: OsString,
+
+    /// A unique tag value for this service in the group specified by the load_order_group
+    /// parameter.
+    pub tag_id: u32,
+
+    /// Service dependencies
+    pub dependencies: Vec<ServiceDependency>,
+
+    /// Account to use for running the service.
+    /// for example: NT Authority\System.
+    /// use `None` to run as LocalSystem.
+    pub account_name: Option<OsString>,
+
+    /// User-friendly service name
+    pub display_name: OsString,
+}
+
+impl ServiceConfig {
+    pub fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig> {
+        Ok(ServiceConfig {
             service_type: ServiceType::from_raw(raw.dwServiceType)?,
             start_type: ServiceStartType::from_raw(raw.dwStartType)?,
             error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
             executable_path: PathBuf::from(
-                unsafe { WideCString::from_ptr_str(raw.lpBinaryPathName) }.to_string_lossy(),
+                unsafe { WideCString::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
             ),
-            launch_arguments: vec![],
+            load_order_group: unsafe { WideCString::from_ptr_str(raw.lpLoadOrderGroup) }
+                .to_os_string(),
+            tag_id: raw.dwTagId,
             dependencies: vec![],
-            account_name: Some(OsString::from(
-                unsafe { WideCString::from_ptr_str(raw.lpServiceStartName) }.to_string_lossy(),
-            )),
-            account_password: None,
+            account_name: Some(
+                unsafe { WideCString::from_ptr_str(raw.lpServiceStartName) }.to_os_string(),
+            ),
+            display_name: unsafe { WideCString::from_ptr_str(raw.lpDisplayName) }.to_os_string(),
         })
     }
 }
@@ -521,7 +566,7 @@ impl Service {
     }
 
     /// Get the service config from the system.
-    pub fn query_config(&self) -> Result<ServiceInfo> {
+    pub fn query_config(&self) -> Result<ServiceConfig> {
         let mut data: Vec<u8>;
         let mut bytes_needed: u32 = 0;
         unsafe {
@@ -544,7 +589,7 @@ impl Service {
         if success == 1 {
             let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
                 unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
-            ServiceInfo::from_raw(raw_config)
+            ServiceConfig::from_raw(raw_config)
         } else {
             Err(io::Error::last_os_error().into())
         }
