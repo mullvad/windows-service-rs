@@ -98,7 +98,7 @@ impl ServiceManager {
     ///
     /// * `service_info`   - The service information that will be saved to the system services
     ///   registry.
-    /// * `service_access` - Desired access permissions for the returned [`Service`]   instance.
+    /// * `service_access` - Desired access permissions for the returned [`Service`] instance.
     ///
     /// # Example
     ///
