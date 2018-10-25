@@ -90,9 +90,9 @@ impl ServiceStartType {
 
     pub fn from_raw(raw: u32) -> Result<ServiceStartType> {
         match raw {
-            winnt::SERVICE_AUTO_START => Ok(ServiceStartType::AutoStart),
-            winnt::SERVICE_DEMAND_START => Ok(ServiceStartType::OnDemand),
-            winnt::SERVICE_DISABLED => Ok(ServiceStartType::Disabled),
+            x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
+            x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
+            x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
             _ => Err(ErrorKind::InvalidServiceStartType(raw))?,
         }
     }
@@ -117,10 +117,10 @@ impl ServiceErrorControl {
 
     pub fn from_raw(raw: u32) -> Result<ServiceErrorControl> {
         match raw {
-            winnt::SERVICE_ERROR_CRITICAL => Ok(ServiceErrorControl::Critical),
-            winnt::SERVICE_ERROR_IGNORE => Ok(ServiceErrorControl::Ignore),
-            winnt::SERVICE_ERROR_NORMAL => Ok(ServiceErrorControl::Normal),
-            winnt::SERVICE_ERROR_SEVERE => Ok(ServiceErrorControl::Severe),
+            x if x == ServiceErrorControl::Critical.to_raw() => Ok(ServiceErrorControl::Critical),
+            x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
+            x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
+            x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
             _ => Err(ErrorKind::InvalidServiceErrorControl(raw))?,
         }
     }
