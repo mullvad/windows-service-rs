@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
-use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
+use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use sc_handle::ScHandle;
@@ -565,33 +565,47 @@ impl Service {
         }
     }
 
-    /// Get the service config from the system.
-    pub fn query_config(&self) -> Result<ServiceConfig> {
-        let mut data: Vec<u8>;
-        let mut bytes_needed: u32 = 0;
-        unsafe {
-            winsvc::QueryServiceConfigW(
-                self.service_handle.raw_handle(),
-                ::std::ptr::null_mut(),
-                mem::size_of::<winsvc::QUERY_SERVICE_CONFIGW>() as u32,
-                &mut bytes_needed,
-            )
-        };
-        let success = unsafe {
-            data = vec![0; bytes_needed as usize];
+    /// Query service config and convert to ServiceConfig
+    fn query_service_config(&self, mut size: u32) -> Result<ServiceConfig> {
+        let mut data = vec![0; size as usize];
+        match unsafe {
             winsvc::QueryServiceConfigW(
                 self.service_handle.raw_handle(),
                 data.as_mut_ptr() as _,
                 data.len() as u32,
+                &mut size,
+            )
+        } {
+            0 => Err(io::Error::last_os_error().into()),
+            _ => {
+                let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
+                    unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
+                ServiceConfig::from_raw(raw_config)
+            }
+        }
+    }
+
+    /// Get the service config from the system.
+    pub fn query_config(&self) -> Result<ServiceConfig> {
+        let mut bytes_needed: u32 = 0;
+        match unsafe {
+            winsvc::QueryServiceConfigW(
+                self.service_handle.raw_handle(),
+                ::std::ptr::null_mut() as _,
+                0,
                 &mut bytes_needed,
             )
-        };
-        if success == 1 {
-            let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
-                unsafe { ::std::ptr::read(data.as_mut_ptr() as _) };
-            ServiceConfig::from_raw(raw_config)
-        } else {
-            Err(io::Error::last_os_error().into())
+        } {
+            0 => match io::Error::last_os_error().raw_os_error() {
+                Some(e) => match e {
+                    i if i == ERROR_INSUFFICIENT_BUFFER as i32 => {
+                        self.query_service_config(bytes_needed)
+                    }
+                    _ => Err(io::Error::last_os_error().into()),
+                },
+                None => Err(io::Error::last_os_error().into()),
+            },
+            _ => self.query_service_config(bytes_needed),
         }
     }
 }
