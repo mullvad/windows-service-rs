@@ -231,10 +231,16 @@ impl ServiceConfig {
                 unsafe { WideCStr::from_ptr_str(raw.lpBinaryPathName) }.to_os_string(),
             ),
             load_order_group: {
-                let value = unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }.to_os_string();
-                match value.len() {
-                    0 => None,
-                    _ => Some(value),
+                match raw.lpLoadOrderGroup {
+                    i if i == ::std::ptr::null_mut() => None,
+                    _ => {
+                        let value =
+                            unsafe { WideCStr::from_ptr_str(raw.lpLoadOrderGroup) }.to_os_string();
+                        match value.len() {
+                            0 => None,
+                            _ => Some(value),
+                        }
+                    }
                 }
             },
             tag_id: raw.dwTagId,
@@ -250,19 +256,22 @@ impl ServiceConfig {
         let mut next = input;
         let mut deps = Vec::new();
         while {
-            match unsafe { WideCStr::from_ptr_str(next) }.to_string() {
-                Ok(value) => match value.len() {
-                    i if i > 0 => {
-                        next = (next as usize + (value.len() * 2 + 2)) as LPWSTR;
-                        match value.starts_with("+") {
-                            true => deps.push(ServiceDependency::Group(value.into())),
-                            _ => deps.push(ServiceDependency::Service(value.into())),
+            match next {
+                i if i == ::std::ptr::null_mut() => false,
+                _ => match unsafe { WideCStr::from_ptr_str(next) }.to_string() {
+                    Ok(value) => match value.len() {
+                        i if i > 0 => {
+                            next = (next as usize + (value.len() * 2 + 2)) as LPWSTR;
+                            match value.starts_with("+") {
+                                true => deps.push(ServiceDependency::Group(value.into())),
+                                _ => deps.push(ServiceDependency::Service(value.into())),
+                            }
+                            true
                         }
-                        true
-                    }
-                    _ => false,
+                        _ => false,
+                    },
+                    Err(_) => false,
                 },
-                Err(_) => false,
             }
         } {}
         match deps.len() {
