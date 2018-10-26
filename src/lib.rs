@@ -259,4 +259,5 @@ pub mod service_manager;
 #[macro_use]
 pub mod service_dispatcher;
 
+mod double_nul_terminated;
 mod shell_escape;
