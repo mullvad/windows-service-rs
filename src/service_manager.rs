@@ -117,7 +117,7 @@ impl ServiceManager {
     ///     let my_service_info = ServiceInfo {
     ///         name: OsString::from("my_service"),
     ///         display_name: OsString::from("My service"),
-    ///         service_type: ServiceType::OwnProcess,
+    ///         service_type: ServiceType::OWN_PROCESS,
     ///         start_type: ServiceStartType::OnDemand,
     ///         error_control: ServiceErrorControl::Normal,
     ///         executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
@@ -176,7 +176,7 @@ impl ServiceManager {
                 service_name.as_ptr(),
                 display_name.as_ptr(),
                 service_access.bits(),
-                service_info.service_type.to_raw(),
+                service_info.service_type.bits(),
                 service_info.start_type.to_raw(),
                 service_info.error_control.to_raw(),
                 launch_command.as_ptr(),

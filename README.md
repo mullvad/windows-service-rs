@@ -134,7 +134,7 @@ fn run_service(arguments: Vec<OsString>) -> windows_service::Result<()> {
 
     let next_status = ServiceStatus {
         // Should match the one from system service registry
-        service_type: ServiceType::OwnProcess,
+        service_type: ServiceType::OWN_PROCESS,
         // The new state
         current_state: ServiceState::Running,
         // Accept stop events when running

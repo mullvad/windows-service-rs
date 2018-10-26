@@ -22,7 +22,7 @@ fn main() -> windows_service::Result<()> {
     let service_info = ServiceInfo {
         name: OsString::from("ping_service"),
         display_name: OsString::from("Ping service"),
-        service_type: ServiceType::OwnProcess,
+        service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::OnDemand,
         error_control: ServiceErrorControl::Normal,
         executable_path: service_binary_path,

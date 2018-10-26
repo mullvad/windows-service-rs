@@ -140,7 +140,7 @@
 //!
 //!     let next_status = ServiceStatus {
 //!         // Should match the one from system service registry
-//!         service_type: ServiceType::OwnProcess,
+//!         service_type: ServiceType::OWN_PROCESS,
 //!         // The new state
 //!         current_state: ServiceState::Running,
 //!         // Accept stop events when running
@@ -225,11 +225,6 @@ error_chain! {
         /// Invalid start argument.
         InvalidStartArgument {
             description("Invalid start argument")
-        }
-        /// Invalid raw representation of [`ServiceType`].
-        InvalidServiceType(raw_value: u32) {
-            description("Invalid service type value")
-            display("Invalid service type value: {}", raw_value)
         }
         /// Invalid raw representation of [`ServiceState`].
         InvalidServiceState(raw_value: u32) {
