@@ -535,7 +535,6 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    ///
     pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
@@ -552,10 +551,10 @@ impl Service {
             )
         };
 
-        if success == 1 {
-            Ok(())
-        } else {
+        if success == 0 {
             Err(io::Error::last_os_error().into())
+        } else {
+            Ok(())
         }
     }
 
@@ -570,20 +569,20 @@ impl Service {
         let success = unsafe {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
         };
-        if success == 1 {
-            ServiceStatus::from_raw(raw_status)
-        } else {
+        if success == 0 {
             Err(io::Error::last_os_error().into())
+        } else {
+            ServiceStatus::from_raw(raw_status)
         }
     }
 
     /// Delete the service from system registry.
     pub fn delete(self) -> io::Result<()> {
         let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
-        if success == 1 {
-            Ok(())
-        } else {
+        if success == 0 {
             Err(io::Error::last_os_error())
+        } else {
+            Ok(())
         }
     }
 
@@ -598,10 +597,10 @@ impl Service {
             )
         };
 
-        if success == 1 {
-            ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
-        } else {
+        if success == 0 {
             Err(io::Error::last_os_error().into())
+        } else {
+            ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
         }
     }
 
