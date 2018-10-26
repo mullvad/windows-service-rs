@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{io, mem};
@@ -145,6 +146,21 @@ impl ServiceDependency {
                 group_identifier.push(name);
                 group_identifier
             }
+        }
+    }
+
+    pub fn from_system_identifier<S: AsRef<OsStr>>(identifier: S) -> Self {
+        let group_prefix: u16 = '+' as u16;
+        let mut iter = identifier.as_ref().encode_wide().peekable();
+
+        if iter.peek() == Some(&group_prefix) {
+            let chars: Vec<u16> = iter.skip(1).collect();
+            let group_name = OsString::from_wide(&chars);
+            ServiceDependency::Group(group_name)
+        } else {
+            let chars: Vec<u16> = iter.collect();
+            let service_name = OsString::from_wide(&chars);
+            ServiceDependency::Service(service_name)
         }
     }
 }
@@ -646,5 +662,29 @@ impl Service {
             },
             _ => self.query_service_config(bytes_needed),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_group_identifier() {
+        let dependency = ServiceDependency::from_system_identifier("+network");
+        assert_eq!(
+            dependency,
+            ServiceDependency::Group(OsString::from("network"))
+        );
+    }
+
+    #[test]
+    fn test_service_name_identifier() {
+        let dependency = ServiceDependency::from_system_identifier("netlogon");
+        assert_eq!(
+            dependency,
+            ServiceDependency::Service(OsString::from("netlogon"))
+        );
     }
 }
