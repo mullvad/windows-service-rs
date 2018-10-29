@@ -9,7 +9,7 @@ use winapi::shared::ntdef::LPWSTR;
 /// "item one\0item two\0\0"
 ///
 /// Returns None if the source collection is empty.
-pub(crate) fn from_vec<T: AsRef<OsStr>>(
+pub fn from_vec<T: AsRef<OsStr>>(
     source: &[T],
 ) -> ::std::result::Result<Option<WideString>, NulError> {
     if source.len() > 0 {
@@ -33,7 +33,7 @@ pub(crate) fn from_vec<T: AsRef<OsStr>>(
 ///
 /// Output:
 /// ["hello", "world"]
-pub(crate) unsafe fn parse_str_ptr(double_nul_terminated_string: LPWSTR) -> Vec<OsString> {
+pub unsafe fn parse_str_ptr(double_nul_terminated_string: LPWSTR) -> Vec<OsString> {
     let mut results: Vec<OsString> = Vec::new();
 
     if !double_nul_terminated_string.is_null() {
