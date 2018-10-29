@@ -9,9 +9,7 @@ use winapi::shared::ntdef::LPWSTR;
 /// "item one\0item two\0\0"
 ///
 /// Returns None if the source collection is empty.
-pub fn from_vec<T: AsRef<OsStr>>(
-    source: &[T],
-) -> ::std::result::Result<Option<WideString>, NulError> {
+pub fn from_vec<T: AsRef<OsStr>>(source: &[T]) -> Result<Option<WideString>, NulError> {
     if source.len() > 0 {
         let mut wide = WideString::new();
         for s in source {
