@@ -7,7 +7,6 @@ use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
-use winapi::shared::ntdef::LPWSTR;
 use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
