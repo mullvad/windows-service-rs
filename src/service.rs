@@ -7,7 +7,7 @@ use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
-use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
+use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use double_nul_terminated;
@@ -237,7 +237,7 @@ impl ServiceConfig {
     pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
-            .map(|identifier| ServiceDependency::from_system_identifier(identifier))
+            .map(ServiceDependency::from_system_identifier)
             .collect();
 
         let load_order_group = ptr::NonNull::new(raw.lpLoadOrderGroup).and_then(|wrapped_ptr| {
@@ -577,43 +577,26 @@ impl Service {
 
     /// Get the service config from the system.
     pub fn query_config(&self) -> Result<ServiceConfig> {
-        let mut bytes_needed: u32 = 0;
+        // As per docs, the maximum size of data buffer used by QueryServiceConfigW is 8K
+        let mut data = [0u8; 8096];
+        let mut bytes_written: u32 = 0;
 
-        // estimate the buffer size needed to store the service config
-        let estimate_result = unsafe {
+        let success = unsafe {
             winsvc::QueryServiceConfigW(
                 self.service_handle.raw_handle(),
-                ptr::null_mut() as _,
-                0,
-                &mut bytes_needed,
+                data.as_mut_ptr() as _,
+                data.len() as u32,
+                &mut bytes_written,
             )
         };
 
-        // the estimate call is supposed to fail with a specific reason
-        if estimate_result == 0
-            && io::Error::last_os_error().raw_os_error() == Some(ERROR_INSUFFICIENT_BUFFER as i32)
-        {
-            let mut data = vec![0; bytes_needed as usize];
-            let query_result = unsafe {
-                winsvc::QueryServiceConfigW(
-                    self.service_handle.raw_handle(),
-                    data.as_mut_ptr() as _,
-                    data.len() as u32,
-                    &mut bytes_needed,
-                )
-            };
-
-            if query_result == 0 {
-                Err(io::Error::last_os_error().into())
-            } else {
-                unsafe {
-                    let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
-                        ptr::read(data.as_mut_ptr() as _);
-                    ServiceConfig::from_raw(raw_config)
-                }
-            }
-        } else {
+        if success == 0 {
             Err(io::Error::last_os_error().into())
+        } else {
+            unsafe {
+                let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
+                ServiceConfig::from_raw(*raw_config)
+            }
         }
     }
 
