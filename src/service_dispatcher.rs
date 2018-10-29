@@ -119,7 +119,6 @@ pub fn start<T: AsRef<OsStr>>(
 #[doc(hidden)]
 pub unsafe fn parse_service_arguments(argc: u32, argv: *mut *mut u16) -> Vec<OsString> {
     (0..argc)
-        .into_iter()
         .map(|i| {
             let array_element_ptr: *mut *mut u16 = argv.offset(i as isize);
             WideCStr::from_ptr_str(*array_element_ptr).to_os_string()

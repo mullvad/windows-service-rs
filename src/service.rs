@@ -631,7 +631,7 @@ impl Service {
         if success == 0 {
             Err(io::Error::last_os_error().into())
         } else {
-            ServiceStatus::from_raw(raw_status).map_err(|err| err.into())
+            ServiceStatus::from_raw(raw_status)
         }
     }
 }

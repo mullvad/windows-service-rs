@@ -13,7 +13,7 @@ use winapi::shared::ntdef::LPWSTR;
 ///
 /// Returns None if the source collection is empty.
 pub fn from_vec<T: AsRef<OsStr>>(source: &[T]) -> Result<Option<WideString>, NulError> {
-    if source.len() > 0 {
+    if source.is_empty() {
         let mut wide = WideString::new();
         for s in source {
             let checked_str = WideCString::from_str(s)?;
