@@ -43,7 +43,7 @@ mod ping_service {
 
 
     const SERVICE_NAME: &'static str = "ping_service";
-    const SERVICE_TYPE: ServiceType = ServiceType::OwnProcess;
+    const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
     const LOOPBACK_ADDR: [u8; 4] = [127, 0, 0, 1];
     const RECEIVER_PORT: u16 = 1234;

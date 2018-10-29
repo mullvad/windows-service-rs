@@ -6,6 +6,7 @@ use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
 use winapi::shared::ntdef::LPWSTR;
+use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
@@ -13,36 +14,28 @@ use sc_handle::ScHandle;
 use {ErrorKind, Result, ResultExt};
 
 /// Enum describing the types of Windows services.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
-pub enum ServiceType {
-    /// File system driver service.
-    FileSystemDriver = winnt::SERVICE_FILE_SYSTEM_DRIVER,
+bitflags! {
+    pub struct ServiceType: DWORD {
+        /// File system driver service.
+        const FILE_SYSTEM_DRIVER = winnt::SERVICE_FILE_SYSTEM_DRIVER;
 
-    /// Driver service.
-    KernelDriver = winnt::SERVICE_KERNEL_DRIVER,
+        /// Driver service.
+        const KERNEL_DRIVER = winnt::SERVICE_KERNEL_DRIVER;
 
-    /// Service that runs in its own process.
-    OwnProcess = winnt::SERVICE_WIN32_OWN_PROCESS,
+        /// Service that runs in its own process.
+        const OWN_PROCESS = winnt::SERVICE_WIN32_OWN_PROCESS;
 
-    /// Service that shares a process with other services.
-    ShareProcess = winnt::SERVICE_WIN32_SHARE_PROCESS,
-}
+        /// Service that shares a process with one or more other services.
+        const SHARE_PROCESS = winnt::SERVICE_WIN32_SHARE_PROCESS;
 
-impl ServiceType {
-    pub fn from_raw(raw_value: u32) -> Result<Self> {
-        let service_type = match raw_value {
-            x if x == ServiceType::FileSystemDriver.to_raw() => ServiceType::FileSystemDriver,
-            x if x == ServiceType::KernelDriver.to_raw() => ServiceType::KernelDriver,
-            x if x == ServiceType::OwnProcess.to_raw() => ServiceType::OwnProcess,
-            x if x == ServiceType::ShareProcess.to_raw() => ServiceType::ShareProcess,
-            _ => Err(ErrorKind::InvalidServiceType(raw_value))?,
-        };
-        Ok(service_type)
-    }
+        /// The service runs in its own process under the logged-on user account.
+        const USER_OWN_PROCESS = winnt::SERVICE_USER_OWN_PROCESS;
 
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
+        /// The service shares a process with one or more other services that run under the logged-on user account.
+        const USER_SHARE_PROCESS = winnt::SERVICE_USER_SHARE_PROCESS;
+
+        /// The service can be interactive.
+        const INTERACTIVE_PROCESS = winnt::SERVICE_INTERACTIVE_PROCESS;
     }
 }
 
@@ -240,7 +233,7 @@ pub struct ServiceConfig {
 impl ServiceConfig {
     pub fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig> {
         Ok(ServiceConfig {
-            service_type: ServiceType::from_raw(raw.dwServiceType)?,
+            service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
             start_type: ServiceStartType::from_raw(raw.dwStartType)?,
             error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
             executable_path: PathBuf::from(
@@ -493,7 +486,7 @@ pub struct ServiceStatus {
 impl ServiceStatus {
     pub(crate) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
-        raw_status.dwServiceType = self.service_type.to_raw();
+        raw_status.dwServiceType = self.service_type.bits();
         raw_status.dwCurrentState = self.current_state.to_raw();
         raw_status.dwControlsAccepted = self.controls_accepted.bits();
 
@@ -509,7 +502,7 @@ impl ServiceStatus {
 
     fn from_raw(raw_status: winsvc::SERVICE_STATUS) -> Result<Self> {
         Ok(ServiceStatus {
-            service_type: ServiceType::from_raw(raw_status.dwServiceType)?,
+            service_type: ServiceType::from_bits_truncate(raw_status.dwServiceType),
             current_state: ServiceState::from_raw(raw_status.dwCurrentState)?,
             controls_accepted: ServiceControlAccept::from_bits_truncate(
                 raw_status.dwControlsAccepted,
