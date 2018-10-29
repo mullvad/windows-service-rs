@@ -3,9 +3,12 @@ use widestring::{NulError, WideCStr, WideCString, WideString};
 use winapi::shared::ntdef::LPWSTR;
 
 /// A helper to join a collection of `OsStr` into a nul-separated `WideString` ending with two nul
-/// bytes.
+/// wide characters.
 ///
-/// Sample output:
+/// Input:
+/// vec!["item one", "item two"]
+///
+/// Output:
 /// "item one\0item two\0\0"
 ///
 /// Returns None if the source collection is empty.
@@ -24,7 +27,8 @@ pub fn from_vec<T: AsRef<OsStr>>(source: &[T]) -> Result<Option<WideString>, Nul
     }
 }
 
-/// A helper to split a C-string pointer ending with two nul bytes into a collection of `OsString`.
+/// A helper to split a wide string pointer ending with two nul characters into a collection of
+/// `OsString`.
 ///
 /// Input:
 /// "hello\0world\0\0"
