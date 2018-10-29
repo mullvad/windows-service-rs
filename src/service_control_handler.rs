@@ -18,7 +18,7 @@ impl ServiceStatusHandle {
     }
 
     /// Report the new service status to the system.
-    pub fn set_service_status(&self, service_status: ServiceStatus) -> io::Result<()> {
+    pub fn set_service_status(&self, service_status: &ServiceStatus) -> io::Result<()> {
         let mut raw_service_status = service_status.to_raw();
         let result = unsafe { winsvc::SetServiceStatus(self.0, &mut raw_service_status) };
         if result == 0 {
