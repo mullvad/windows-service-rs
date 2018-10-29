@@ -1,12 +1,13 @@
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
+use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{WideCStr, WideCString};
-use winapi::shared::ntdef::LPWSTR;
 use winapi::shared::minwindef::DWORD;
+use winapi::shared::ntdef::LPWSTR;
 use winapi::shared::winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
@@ -240,19 +241,18 @@ impl ServiceConfig {
             .map(|identifier| ServiceDependency::from_system_identifier(identifier))
             .collect();
 
-        let load_order_group =
-            std::ptr::NonNull::new(raw.lpLoadOrderGroup).and_then(|wrapped_ptr| {
-                let group = WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string();
-                // Return None for consistency, because lpLoadOrderGroup can be either nul or empty
-                // string, which has the same meaning.
-                if group.is_empty() {
-                    None
-                } else {
-                    Some(group)
-                }
-            });
+        let load_order_group = ptr::NonNull::new(raw.lpLoadOrderGroup).and_then(|wrapped_ptr| {
+            let group = WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string();
+            // Return None for consistency, because lpLoadOrderGroup can be either nul or empty
+            // string, which has the same meaning.
+            if group.is_empty() {
+                None
+            } else {
+                Some(group)
+            }
+        });
 
-        let account_name = std::ptr::NonNull::new(raw.lpServiceStartName)
+        let account_name = ptr::NonNull::new(raw.lpServiceStartName)
             .map(|wrapped_ptr| WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string());
 
         Ok(ServiceConfig {
@@ -584,7 +584,7 @@ impl Service {
         let estimate_result = unsafe {
             winsvc::QueryServiceConfigW(
                 self.service_handle.raw_handle(),
-                ::std::ptr::null_mut() as _,
+                ptr::null_mut() as _,
                 0,
                 &mut bytes_needed,
             )
@@ -609,7 +609,7 @@ impl Service {
             } else {
                 unsafe {
                     let raw_config: winsvc::QUERY_SERVICE_CONFIGW =
-                        ::std::ptr::read(data.as_mut_ptr() as _);
+                        ptr::read(data.as_mut_ptr() as _);
                     ServiceConfig::from_raw(raw_config)
                 }
             }
