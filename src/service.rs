@@ -10,12 +10,12 @@ use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
-use double_nul_terminated;
-use sc_handle::ScHandle;
-use {ErrorKind, Result, ResultExt};
+use crate::double_nul_terminated;
+use crate::sc_handle::ScHandle;
+use crate::{ErrorKind, Result, ResultExt};
 
 /// Enum describing the types of Windows services.
-bitflags! {
+bitflags::bitflags! {
     pub struct ServiceType: DWORD {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = winnt::SERVICE_FILE_SYSTEM_DRIVER;
@@ -40,7 +40,7 @@ bitflags! {
     }
 }
 
-bitflags! {
+bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
     pub struct ServiceAccess: u32 {
         /// Can query the service status
@@ -398,7 +398,7 @@ impl<'a> From<&'a winsvc::SERVICE_STATUS> for ServiceExitCode {
     }
 }
 
-bitflags! {
+bitflags::bitflags! {
     /// Flags describing accepted types of service control events.
     pub struct ServiceControlAccept: u32 {
         /// The service is a network component that can accept changes in its binding without being

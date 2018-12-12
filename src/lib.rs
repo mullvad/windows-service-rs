@@ -176,11 +176,9 @@
 #![recursion_limit = "128"]
 
 #[macro_use]
-extern crate bitflags;
-#[macro_use]
 extern crate error_chain;
-extern crate widestring;
-extern crate winapi;
+
+
 
 pub use error_chain::ChainedError;
 

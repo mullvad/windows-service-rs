@@ -8,6 +8,7 @@ keywords = ["windows", "service", "daemon"]
 categories = ["api-bindings"]
 repository = "https://github.com/mullvad/windows-service-rs"
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.0.1"

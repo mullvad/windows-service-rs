@@ -17,7 +17,7 @@ mod utf16 {
 ///
 /// Inspired by https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/.
 /// Heavily based on https://github.com/sfackler/shell-escape
-pub fn escape(s: Cow<OsStr>) -> Cow<OsStr> {
+pub fn escape(s: Cow<'_, OsStr>) -> Cow<'_, OsStr> {
     static ESCAPE_CHARS: &'static [u16] = &[
         utf16::DOUBLEQUOTE,
         utf16::SPACE,

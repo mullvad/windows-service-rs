@@ -4,7 +4,7 @@ use std::{io, ptr};
 use widestring::{WideCStr, WideCString};
 use winapi::um::winsvc;
 
-use {ErrorKind, Result, ResultExt};
+use crate::{ErrorKind, Result, ResultExt};
 
 /// A macro to generate an entry point function (aka "service_main") for Windows service.
 ///
