@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Changed `service_control_handler::register` to accept an `FnMut` rather than just an `Fn` for the
   `event_handler` closure.
+- Upgrade to Rust 2018. This raises the minimum required Rust version to 1.31.0.
 
 ### Fixed
 - Fix invalid pointer manipulations in service creation routine in ServiceManager.
