@@ -5,8 +5,8 @@ use widestring::WideCString;
 use winapi::shared::winerror::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR};
 use winapi::um::winsvc;
 
-use service::{ServiceControl, ServiceStatus};
-use {ErrorKind, Result, ResultExt};
+use crate::service::{ServiceControl, ServiceStatus};
+use crate::{ErrorKind, Result, ResultExt};
 
 /// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]

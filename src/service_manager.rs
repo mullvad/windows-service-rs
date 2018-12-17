@@ -5,14 +5,14 @@ use std::{io, ptr};
 use widestring::{NulError, WideCString, WideString};
 use winapi::um::winsvc;
 
-use double_nul_terminated;
-use sc_handle::ScHandle;
-use service::{Service, ServiceAccess, ServiceInfo};
-use shell_escape;
+use crate::double_nul_terminated;
+use crate::sc_handle::ScHandle;
+use crate::service::{Service, ServiceAccess, ServiceInfo};
+use crate::shell_escape;
 
-use {ErrorKind, Result, ResultExt};
+use crate::{ErrorKind, Result, ResultExt};
 
-bitflags! {
+bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
     pub struct ServiceManagerAccess: u32 {
         /// Can connect to service control manager.
