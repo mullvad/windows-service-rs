@@ -175,10 +175,13 @@
 // Because of how deeply error-chain recurse with this many error types.
 #![recursion_limit = "128"]
 
+#[cfg(feature = "default")]
 #[macro_use]
 extern crate error_chain;
 
-
+#[cfg(feature = "legacy-support")]
+#[macro_use]
+extern crate error_chain_without_backtrace as error_chain;
 
 pub use error_chain::ChainedError;
 
