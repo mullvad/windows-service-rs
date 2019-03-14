@@ -5,7 +5,7 @@ use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
 
-use failure::Error;
+pub use failure::Error;
 use widestring::{WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
@@ -516,7 +516,7 @@ impl Service {
     /// use windows_service::service::ServiceAccess;
     /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
     ///
-    /// # fn main() -> windows_service::Result<(), Error> {
+    /// # fn main() -> windows_service::Result<()> {
     /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     /// let my_service = manager.open_service("my_service", ServiceAccess::START)?;
     /// my_service.start(&[OsStr::new("Started from Rust!")])?;
