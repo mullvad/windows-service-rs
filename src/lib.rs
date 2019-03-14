@@ -172,82 +172,56 @@
 //! [`Running`]: service::ServiceState::Running
 
 #![cfg(windows)]
-// Because of how deeply error-chain recurse with this many error types.
-#![recursion_limit = "128"]
 
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 
+pub use failure::Error;
 
-
-pub use error_chain::ChainedError;
-
-error_chain! {
-    errors {
-        /// Invalid account name.
-        InvalidAccountName {
-            description("Invalid account name")
-        }
-        /// Invalid account password.
-        InvalidAccountPassword {
-            description("Invalid account password")
-        }
-        /// Invalid display name.
-        InvalidDisplayName {
-            description("Invalid display name")
-        }
-        /// Invalid database name.
-        InvalidDatabaseName {
-            description("Invalid database name")
-        }
-        /// Invalid executable path.
-        InvalidExecutablePath {
-            description("Invalid executable path")
-        }
-        /// Invalid launch arguments.
-        InvalidLaunchArgument {
-            description("Invalid launch argument")
-        }
-        /// Invalid dependency name.
-        InvalidDependency {
-            description("Invalid dependency name")
-        }
-        /// Invalid machine name.
-        InvalidMachineName {
-            description("Invalid machine name")
-        }
-        /// Invalid service name.
-        InvalidServiceName {
-            description("Invalid service name")
-        }
-        /// Invalid start argument.
-        InvalidStartArgument {
-            description("Invalid start argument")
-        }
-        /// Invalid raw representation of [`ServiceState`].
-        InvalidServiceState(raw_value: u32) {
-            description("Invalid service state")
-            display("Invalid service state value: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceControl`].
-        InvalidServiceControl(raw_value: u32) {
-            description("Invalid service control")
-            display("Invalid service control value: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceStartType`].
-        InvalidServiceStartType(raw_value: u32) {
-            description("Invalid service start type")
-            display("Invalid service start type: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceErrorControl`].
-        InvalidServiceErrorControl(raw_value: u32) {
-            description("Invalid service error control type")
-            display("Invalid service error control type: {}", raw_value)
-        }
-    }
-    foreign_links {
-        System(::std::io::Error) #[doc = "System call error"];
-    }
+#[derive(Fail, Debug)]
+pub(crate) enum ErrorKind {
+    /// Invalid account name.
+    #[fail(display = "Invalid account name")]
+    InvalidAccountName,
+    /// Invalid account password.
+    #[fail(display = "Invalid account password")]
+    InvalidAccountPassword,
+    /// Invalid display name.
+    #[fail(display = "Invalid display name")]
+    InvalidDisplayName,
+    /// Invalid database name.
+    #[fail(display = "Invalid database name")]
+    InvalidDatabaseName,
+    /// Invalid executable path.
+    #[fail(display = "Invalid executable path")]
+    InvalidExecutablePath,
+    /// Invalid launch arguments.
+    #[fail(display = "Invalid launch argument")]
+    InvalidLaunchArgument,
+    /// Invalid dependency name.
+    #[fail(display = "Invalid dependency name")]
+    InvalidDependency,
+    /// Invalid machine name.
+    #[fail(display = "Invalid machine name")]
+    InvalidMachineName,
+    /// Invalid service name.
+    #[fail(display = "Invalid service name")]
+    InvalidServiceName,
+    /// Invalid start argument.
+    #[fail(display = "Invalid start argument")]
+    InvalidStartArgument,
+    /// Invalid raw representation of [`ServiceState`].
+    #[fail(display = "Invalid service state value: {}", _0)]
+    InvalidServiceState(u32),
+    /// Invalid raw representation of [`ServiceControl`].
+    #[fail(display = "Invalid service control value: {}", _0)]
+    InvalidServiceControl(u32),
+    /// Invalid raw representation of [`ServiceStartType`].
+    #[fail(display = "Invalid service start type: {}", _0)]
+    InvalidServiceStartType(u32),
+    /// Invalid raw representation of [`ServiceErrorControl`].
+    #[fail(display = "Invalid service error control type: {}", _0)]
+    InvalidServiceErrorControl(u32),
 }
 
 mod sc_handle;
