@@ -527,8 +527,6 @@ impl Service {
         let wide_service_arguments = service_arguments
             .iter()
             .map(|s| WideCString::from_str(s).map_err(|_| ErrorKind::InvalidStartArgument))
-            .collect::<Vec<Result<WideCString, _>>>()
-            .into_iter()
             .collect::<Result<Vec<WideCString>, _>>()?;
 
         let mut raw_service_arguments: Vec<*const u16> = wide_service_arguments
