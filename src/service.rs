@@ -529,10 +529,8 @@ impl Service {
             .map(|s| WideCString::from_str(s).map_err(|_| ErrorKind::InvalidStartArgument))
             .collect::<Result<Vec<WideCString>, _>>()?;
 
-        let mut raw_service_arguments: Vec<*const u16> = wide_service_arguments
-            .into_iter()
-            .map(|s| s.as_ptr())
-            .collect();
+        let mut raw_service_arguments: Vec<*const u16> =
+            wide_service_arguments.iter().map(|s| s.as_ptr()).collect();
 
         let success = unsafe {
             winsvc::StartServiceW(
