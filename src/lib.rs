@@ -30,7 +30,7 @@
 //! extern crate windows_service;
 //!
 //! use std::ffi::OsString;
-//! use windows_service::service_dispatcher;
+//! use windows_service::{Result, service_dispatcher};
 //!
 //! define_windows_service!(ffi_service_main, my_service_main);
 //!
@@ -58,6 +58,7 @@
 //! use std::ffi::OsString;
 //! use windows_service::service::ServiceControl;
 //! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+//! use windows_service::Result;
 //!
 //! fn my_service_main(arguments: Vec<OsString>) {
 //!     if let Err(_e) = run_service(arguments) {
@@ -235,6 +236,10 @@ pub enum Error {
     #[error(display = "Invalid service error control type: {}", _0)]
     InvalidServiceErrorControl(u32),
 
+    /// A generic IO error
+    #[error(display = "An IO error has been encountered")]
+    IoError(#[error(cause)] std::io::Error),
+
     /// Failed to send command to service Service deletion to start
     #[error(display = "Could not send commands to service")]
     ServiceControlFailed(#[error(cause)] std::io::Error),
@@ -266,6 +271,16 @@ pub enum Error {
     /// Service failed to start
     #[error(display = "Could not start service")]
     ServiceStartFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to set service status
+    #[error(display = "Could not set service status")]
+    ServiceStatusFailed(#[error(cause)] std::io::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Error::IoError(error)
+    }
 }
 
 mod sc_handle;
