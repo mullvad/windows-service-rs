@@ -12,6 +12,6 @@ edition = "2018"
 
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.0.1"
-failure = "0.1.5"
+err-derive = "0.1.5"
 winapi = { version = "0.3.5", features = ["std", "winsvc", "winerror"] }
 widestring = "0.3.0"

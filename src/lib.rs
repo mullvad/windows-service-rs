@@ -174,55 +174,62 @@
 #![cfg(windows)]
 
 #[macro_use]
-extern crate failure;
-pub type Result<T> = std::result::Result<T, failure::Error>;
+extern crate err_derive;
+pub type Result<T> = std::result::Result<T, ErrorKind>;
 
-pub use failure::Error;
-
-#[derive(Fail, Debug)]
-pub(crate) enum ErrorKind {
+#[derive(Error, Debug)]
+pub enum ErrorKind {
     /// Invalid account name.
-    #[fail(display = "Invalid account name")]
+    #[error(display = "Invalid account name")]
     InvalidAccountName,
     /// Invalid account password.
-    #[fail(display = "Invalid account password")]
+    #[error(display = "Invalid account password")]
     InvalidAccountPassword,
     /// Invalid display name.
-    #[fail(display = "Invalid display name")]
+    #[error(display = "Invalid display name")]
     InvalidDisplayName,
     /// Invalid database name.
-    #[fail(display = "Invalid database name")]
+    #[error(display = "Invalid database name")]
     InvalidDatabaseName,
     /// Invalid executable path.
-    #[fail(display = "Invalid executable path")]
+    #[error(display = "Invalid executable path")]
     InvalidExecutablePath,
     /// Invalid launch arguments.
-    #[fail(display = "Invalid launch argument")]
+    #[error(display = "Invalid launch argument")]
     InvalidLaunchArgument,
     /// Invalid dependency name.
-    #[fail(display = "Invalid dependency name")]
+    #[error(display = "Invalid dependency name")]
     InvalidDependency,
     /// Invalid machine name.
-    #[fail(display = "Invalid machine name")]
+    #[error(display = "Invalid machine name")]
     InvalidMachineName,
     /// Invalid service name.
-    #[fail(display = "Invalid service name")]
+    #[error(display = "Invalid service name")]
     InvalidServiceName,
     /// Invalid start argument.
-    #[fail(display = "Invalid start argument")]
+    #[error(display = "Invalid start argument")]
     InvalidStartArgument,
     /// Invalid raw representation of [`ServiceState`].
-    #[fail(display = "Invalid service state value: {}", _0)]
+    #[error(display = "Invalid service state value: {}", _0)]
     InvalidServiceState(u32),
     /// Invalid raw representation of [`ServiceControl`].
-    #[fail(display = "Invalid service control value: {}", _0)]
+    #[error(display = "Invalid service control value: {}", _0)]
     InvalidServiceControl(u32),
     /// Invalid raw representation of [`ServiceStartType`].
-    #[fail(display = "Invalid service start type: {}", _0)]
+    #[error(display = "Invalid service start type: {}", _0)]
     InvalidServiceStartType(u32),
     /// Invalid raw representation of [`ServiceErrorControl`].
-    #[fail(display = "Invalid service error control type: {}", _0)]
+    #[error(display = "Invalid service error control type: {}", _0)]
     InvalidServiceErrorControl(u32),
+    /// IO error
+    #[error(display = "IO Error: {}", _0)]
+    IOError(String),
+}
+
+impl From<std::io::Error> for ErrorKind {
+    fn from(error: std::io::Error) -> Self {
+        ErrorKind::IOError(error.to_string())
+    }
 }
 
 mod sc_handle;

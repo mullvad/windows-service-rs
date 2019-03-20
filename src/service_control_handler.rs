@@ -1,4 +1,3 @@
-use failure::Error;
 use std::ffi::OsStr;
 use std::io;
 use std::os::raw::c_void;
@@ -93,7 +92,7 @@ impl ServiceControlHandlerResult {
 ///
 /// # fn main() {}
 /// ```
-pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle, Error>
+pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle, ErrorKind>
 where
     S: AsRef<OsStr>,
     F: FnMut(ServiceControl) -> ServiceControlHandlerResult + 'static + Send,

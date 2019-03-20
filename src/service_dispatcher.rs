@@ -1,7 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
-use failure::Error;
 use widestring::{WideCStr, WideCString};
 use winapi::um::winsvc;
 
@@ -91,7 +90,7 @@ macro_rules! define_windows_service {
 pub fn start<T: AsRef<OsStr>>(
     service_name: T,
     service_main: extern "system" fn(u32, *mut *mut u16),
-) -> Result<(), Error> {
+) -> Result<(), ErrorKind> {
     let service_name =
         WideCString::from_str(service_name).map_err(|_| ErrorKind::InvalidServiceName)?;
     let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[

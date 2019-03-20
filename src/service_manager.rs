@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
-use failure::Error;
 use widestring::{NulError, WideCString, WideString};
 use winapi::um::winsvc;
 
@@ -44,7 +43,7 @@ impl ServiceManager {
         machine: Option<M>,
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ErrorKind> {
         let machine_name = to_wide(machine).map_err(|_| ErrorKind::InvalidMachineName)?;
         let database_name = to_wide(database).map_err(|_| ErrorKind::InvalidDatabaseName)?;
         let handle = unsafe {
@@ -74,7 +73,7 @@ impl ServiceManager {
     pub fn local_computer<D: AsRef<OsStr>>(
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ErrorKind> {
         ServiceManager::new(None::<&OsStr>, database, request_access)
     }
 
@@ -90,7 +89,7 @@ impl ServiceManager {
         machine: M,
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ErrorKind> {
         ServiceManager::new(Some(machine), database, request_access)
     }
 
@@ -137,7 +136,7 @@ impl ServiceManager {
         &self,
         service_info: ServiceInfo,
         service_access: ServiceAccess,
-    ) -> Result<Service, Error> {
+    ) -> Result<Service, ErrorKind> {
         let service_name =
             WideCString::from_str(service_info.name).map_err(|_| ErrorKind::InvalidServiceName)?;
         let display_name = WideCString::from_str(service_info.display_name)
@@ -224,7 +223,7 @@ impl ServiceManager {
         &self,
         name: T,
         request_access: ServiceAccess,
-    ) -> Result<Service, Error> {
+    ) -> Result<Service, ErrorKind> {
         let service_name =
             WideCString::from_str(name).map_err(|_| ErrorKind::InvalidServiceName)?;
         let service_handle = unsafe {

@@ -5,7 +5,6 @@ use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
 
-pub use failure::Error;
 use widestring::{WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
@@ -84,12 +83,12 @@ impl ServiceStartType {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceStartType, Error> {
+    pub fn from_raw(raw: u32) -> Result<ServiceStartType, ErrorKind> {
         match raw {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(ErrorKind::InvalidServiceStartType(raw).into()),
+            _ => Err(ErrorKind::InvalidServiceStartType(raw)),
         }
     }
 }
@@ -111,13 +110,13 @@ impl ServiceErrorControl {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl, Error> {
+    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl, ErrorKind> {
         match raw {
             x if x == ServiceErrorControl::Critical.to_raw() => Ok(ServiceErrorControl::Critical),
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(ErrorKind::InvalidServiceErrorControl(raw).into()),
+            _ => Err(ErrorKind::InvalidServiceErrorControl(raw)),
         }
     }
 }
@@ -235,7 +234,7 @@ pub struct ServiceConfig {
 }
 
 impl ServiceConfig {
-    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig, Error> {
+    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig, ErrorKind> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
             .map(ServiceDependency::from_system_identifier)
@@ -289,7 +288,7 @@ pub enum ServiceControl {
 }
 
 impl ServiceControl {
-    pub fn from_raw(raw_value: u32) -> Result<Self, Error> {
+    pub fn from_raw(raw_value: u32) -> Result<Self, ErrorKind> {
         match raw_value {
             x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
             x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
@@ -302,7 +301,7 @@ impl ServiceControl {
             x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
             x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
             x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
-            other => Err(ErrorKind::InvalidServiceControl(other).into()),
+            other => Err(ErrorKind::InvalidServiceControl(other)),
         }
     }
 
@@ -325,7 +324,7 @@ pub enum ServiceState {
 }
 
 impl ServiceState {
-    fn from_raw(raw_state: u32) -> Result<Self, Error> {
+    fn from_raw(raw_state: u32) -> Result<Self, ErrorKind> {
         match raw_state {
             x if x == ServiceState::Stopped.to_raw() => Ok(ServiceState::Stopped),
             x if x == ServiceState::StartPending.to_raw() => Ok(ServiceState::StartPending),
@@ -334,7 +333,7 @@ impl ServiceState {
             x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
             x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
             x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
-            other => Err(ErrorKind::InvalidServiceState(other).into()),
+            other => Err(ErrorKind::InvalidServiceState(other)),
         }
     }
 
@@ -479,7 +478,7 @@ impl ServiceStatus {
         raw_status
     }
 
-    fn from_raw(raw_status: winsvc::SERVICE_STATUS) -> Result<Self, Error> {
+    fn from_raw(raw_status: winsvc::SERVICE_STATUS) -> Result<Self, ErrorKind> {
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw_status.dwServiceType),
             current_state: ServiceState::from_raw(raw_status.dwCurrentState)?,
@@ -523,7 +522,7 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<(), Error> {
+    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<(), ErrorKind> {
         let wide_service_arguments = service_arguments
             .iter()
             .map(|s| WideCString::from_str(s).map_err(|_| ErrorKind::InvalidStartArgument))
@@ -548,12 +547,12 @@ impl Service {
     }
 
     /// Stop the service.
-    pub fn stop(&self) -> Result<ServiceStatus, Error> {
+    pub fn stop(&self) -> Result<ServiceStatus, ErrorKind> {
         self.send_control_command(ServiceControl::Stop)
     }
 
     /// Get the service status from the system.
-    pub fn query_status(&self) -> Result<ServiceStatus, Error> {
+    pub fn query_status(&self) -> Result<ServiceStatus, ErrorKind> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         let success = unsafe {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
@@ -576,7 +575,7 @@ impl Service {
     }
 
     /// Get the service config from the system.
-    pub fn query_config(&self) -> Result<ServiceConfig, Error> {
+    pub fn query_config(&self) -> Result<ServiceConfig, ErrorKind> {
         // As per docs, the maximum size of data buffer used by QueryServiceConfigW is 8K
         let mut data = [0u8; 8096];
         let mut bytes_written: u32 = 0;
@@ -601,7 +600,7 @@ impl Service {
     }
 
     /// Private helper to send the control commands to the system.
-    fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus, Error> {
+    fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus, ErrorKind> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         let success = unsafe {
             winsvc::ControlService(
