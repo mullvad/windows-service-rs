@@ -10,7 +10,7 @@ use crate::sc_handle::ScHandle;
 use crate::service::{Service, ServiceAccess, ServiceInfo};
 use crate::shell_escape;
 
-use crate::ErrorKind;
+use crate::{Error, Result};
 
 bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
@@ -43,9 +43,9 @@ impl ServiceManager {
         machine: Option<M>,
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, ErrorKind> {
-        let machine_name = to_wide(machine).map_err(|_| ErrorKind::InvalidMachineName)?;
-        let database_name = to_wide(database).map_err(|_| ErrorKind::InvalidDatabaseName)?;
+    ) -> Result<Self> {
+        let machine_name = to_wide(machine).map_err(|_| Error::InvalidMachineName)?;
+        let database_name = to_wide(database).map_err(|_| Error::InvalidDatabaseName)?;
         let handle = unsafe {
             winsvc::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
@@ -73,7 +73,7 @@ impl ServiceManager {
     pub fn local_computer<D: AsRef<OsStr>>(
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, ErrorKind> {
+    ) -> Result<Self> {
         ServiceManager::new(None::<&OsStr>, database, request_access)
     }
 
@@ -89,7 +89,7 @@ impl ServiceManager {
         machine: M,
         database: Option<D>,
         request_access: ServiceManagerAccess,
-    ) -> Result<Self, ErrorKind> {
+    ) -> Result<Self> {
         ServiceManager::new(Some(machine), database, request_access)
     }
 
@@ -136,26 +136,25 @@ impl ServiceManager {
         &self,
         service_info: ServiceInfo,
         service_access: ServiceAccess,
-    ) -> Result<Service, ErrorKind> {
+    ) -> Result<Service> {
         let service_name =
-            WideCString::from_str(service_info.name).map_err(|_| ErrorKind::InvalidServiceName)?;
+            WideCString::from_str(service_info.name).map_err(|_| Error::InvalidServiceName)?;
         let display_name = WideCString::from_str(service_info.display_name)
-            .map_err(|_| ErrorKind::InvalidDisplayName)?;
+            .map_err(|_| Error::InvalidDisplayName)?;
         let account_name =
-            to_wide(service_info.account_name).map_err(|_| ErrorKind::InvalidAccountName)?;
-        let account_password = to_wide(service_info.account_password)
-            .map_err(|_| ErrorKind::InvalidAccountPassword)?;
+            to_wide(service_info.account_name).map_err(|_| Error::InvalidAccountName)?;
+        let account_password =
+            to_wide(service_info.account_password).map_err(|_| Error::InvalidAccountPassword)?;
 
         // escape executable path and arguments and combine them into single command
-        let executable_path = escape_wide(service_info.executable_path)
-            .map_err(|_| ErrorKind::InvalidExecutablePath)?;
+        let executable_path =
+            escape_wide(service_info.executable_path).map_err(|_| Error::InvalidExecutablePath)?;
 
         let mut launch_command_buffer = WideString::new();
         launch_command_buffer.push(executable_path);
 
         for launch_argument in service_info.launch_arguments.iter() {
-            let wide =
-                escape_wide(launch_argument).map_err(|_| ErrorKind::InvalidLaunchArgument)?;
+            let wide = escape_wide(launch_argument).map_err(|_| Error::InvalidLaunchArgument)?;
 
             launch_command_buffer.push_str(" ");
             launch_command_buffer.push(wide);
@@ -169,7 +168,7 @@ impl ServiceManager {
             .map(|dependency| dependency.to_system_identifier())
             .collect();
         let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
-            .map_err(|_| ErrorKind::InvalidDependency)?;
+            .map_err(|_| Error::InvalidDependency)?;
 
         let service_handle = unsafe {
             winsvc::CreateServiceW(
@@ -223,9 +222,8 @@ impl ServiceManager {
         &self,
         name: T,
         request_access: ServiceAccess,
-    ) -> Result<Service, ErrorKind> {
-        let service_name =
-            WideCString::from_str(name).map_err(|_| ErrorKind::InvalidServiceName)?;
+    ) -> Result<Service> {
+        let service_name = WideCString::from_str(name).map_err(|_| Error::InvalidServiceName)?;
         let service_handle = unsafe {
             winsvc::OpenServiceW(
                 self.manager_handle.raw_handle(),

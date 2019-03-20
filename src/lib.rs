@@ -39,7 +39,7 @@
 //!     // `service_dispatcher::start` from `main`.
 //! }
 //!
-//! fn main() -> Result<(), windows_service::Error> {
+//! fn main() -> Result<()> {
 //!     // Register generated `ffi_service_main` with the system and start the service, blocking
 //!     // this thread until the service is stopped.
 //!     service_dispatcher::start("myservice", ffi_service_main)?;
@@ -65,7 +65,7 @@
 //!     }
 //! }
 //!
-//! fn run_service(arguments: Vec<OsString>) -> Result<(), windows_service::Error> {
+//! fn run_service(arguments: Vec<OsString>) -> Result<()> {
 //!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
 //!         match control_event {
 //!             ServiceControl::Stop => {
@@ -175,10 +175,10 @@
 
 #[macro_use]
 extern crate err_derive;
-pub type Result<T> = std::result::Result<T, ErrorKind>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
-pub enum ErrorKind {
+pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
     InvalidAccountName,
@@ -208,7 +208,7 @@ pub enum ErrorKind {
     InvalidServiceName,
     /// Invalid start argument.
     #[error(display = "Invalid start argument")]
-    InvalidStartArgument,
+    InvalidStartArgument(#[error(cause)] widestring::NulError),
     /// Invalid raw representation of [`ServiceState`].
     #[error(display = "Invalid service state value: {}", _0)]
     InvalidServiceState(u32),
@@ -222,13 +222,13 @@ pub enum ErrorKind {
     #[error(display = "Invalid service error control type: {}", _0)]
     InvalidServiceErrorControl(u32),
     /// IO error
-    #[error(display = "IO Error: {}", _0)]
-    IOError(String),
+    #[error(display = "IO Error")]
+    IOError(#[error(cause)] std::io::Error),
 }
 
-impl From<std::io::Error> for ErrorKind {
+impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
-        ErrorKind::IOError(error.to_string())
+        Error::IOError(error)
     }
 }
 

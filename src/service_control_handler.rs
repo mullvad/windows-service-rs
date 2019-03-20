@@ -6,7 +6,7 @@ use winapi::shared::winerror::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR};
 use winapi::um::winsvc;
 
 use crate::service::{ServiceControl, ServiceStatus};
-use crate::ErrorKind;
+use crate::{Error, Result};
 
 /// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]
@@ -92,7 +92,7 @@ impl ServiceControlHandlerResult {
 ///
 /// # fn main() {}
 /// ```
-pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle, ErrorKind>
+pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle>
 where
     S: AsRef<OsStr>,
     F: FnMut(ServiceControl) -> ServiceControlHandlerResult + 'static + Send,
@@ -104,7 +104,7 @@ where
     let context: *mut F = Box::into_raw(heap_event_handler);
 
     let service_name =
-        WideCString::from_str(service_name).map_err(|_| ErrorKind::InvalidServiceName)?;
+        WideCString::from_str(service_name).map_err(|_| Error::InvalidServiceName)?;
     let status_handle = unsafe {
         winsvc::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),
