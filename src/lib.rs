@@ -174,11 +174,9 @@
 
 #![cfg(windows)]
 
-#[macro_use]
-extern crate err_derive;
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error, Debug)]
+#[derive(err_derive::Error, Debug)]
 pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
