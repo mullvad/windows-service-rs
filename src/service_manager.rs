@@ -55,7 +55,9 @@ impl ServiceManager {
         };
 
         if handle.is_null() {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceManagerConnectFailed(
+                io::Error::last_os_error(),
+            ))
         } else {
             Ok(ServiceManager {
                 manager_handle: unsafe { ScHandle::new(handle) },
@@ -193,7 +195,7 @@ impl ServiceManager {
         };
 
         if service_handle.is_null() {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceCreateFailed(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
@@ -233,7 +235,7 @@ impl ServiceManager {
         };
 
         if service_handle.is_null() {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceOpenFailed(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }

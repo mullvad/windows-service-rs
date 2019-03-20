@@ -116,7 +116,7 @@ where
     if status_handle.is_null() {
         // Release the `event_handler` in case of an error.
         let _: Box<F> = unsafe { Box::from_raw(context) };
-        Err(io::Error::last_os_error().into())
+        Err(Error::ServiceRegisterFailed(io::Error::last_os_error()))
     } else {
         Ok(ServiceStatusHandle::from_handle(status_handle))
     }

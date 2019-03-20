@@ -182,54 +182,90 @@ pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
     InvalidAccountName,
+
     /// Invalid account password.
     #[error(display = "Invalid account password")]
     InvalidAccountPassword,
+
     /// Invalid display name.
     #[error(display = "Invalid display name")]
     InvalidDisplayName,
+
     /// Invalid database name.
     #[error(display = "Invalid database name")]
     InvalidDatabaseName,
+
     /// Invalid executable path.
     #[error(display = "Invalid executable path")]
     InvalidExecutablePath,
+
     /// Invalid launch arguments.
     #[error(display = "Invalid launch argument")]
     InvalidLaunchArgument,
+
     /// Invalid dependency name.
     #[error(display = "Invalid dependency name")]
     InvalidDependency,
+
     /// Invalid machine name.
     #[error(display = "Invalid machine name")]
     InvalidMachineName,
+
     /// Invalid service name.
     #[error(display = "Invalid service name")]
     InvalidServiceName,
+
     /// Invalid start argument.
     #[error(display = "Invalid start argument")]
     InvalidStartArgument(#[error(cause)] widestring::NulError),
+
     /// Invalid raw representation of [`ServiceState`].
     #[error(display = "Invalid service state value: {}", _0)]
     InvalidServiceState(u32),
+
     /// Invalid raw representation of [`ServiceControl`].
     #[error(display = "Invalid service control value: {}", _0)]
     InvalidServiceControl(u32),
+
     /// Invalid raw representation of [`ServiceStartType`].
     #[error(display = "Invalid service start type: {}", _0)]
     InvalidServiceStartType(u32),
+
     /// Invalid raw representation of [`ServiceErrorControl`].
     #[error(display = "Invalid service error control type: {}", _0)]
     InvalidServiceErrorControl(u32),
-    /// IO error
-    #[error(display = "IO Error")]
-    IOError(#[error(cause)] std::io::Error),
-}
 
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        Error::IOError(error)
-    }
+    /// Failed to send command to service Service deletion to start
+    #[error(display = "Could not send commands to service")]
+    ServiceControlFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to create service
+    #[error(display = "Could not create service")]
+    ServiceCreateFailed(#[error(cause)] std::io::Error),
+
+    /// Service deletion failed
+    #[error(display = "Could not delete service")]
+    ServiceDeleteFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to connect to service manager
+    #[error(display = "Could not connect to service manager")]
+    ServiceManagerConnectFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to open service
+    #[error(display = "Could not open service")]
+    ServiceOpenFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to query Service
+    #[error(display = "Could not query service")]
+    ServiceQueryFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to register service
+    #[error(display = "Could not register service")]
+    ServiceRegisterFailed(#[error(cause)] std::io::Error),
+
+    /// Service failed to start
+    #[error(display = "Could not start service")]
+    ServiceStartFailed(#[error(cause)] std::io::Error),
 }
 
 mod sc_handle;

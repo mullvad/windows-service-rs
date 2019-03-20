@@ -107,7 +107,7 @@ pub fn start<T: AsRef<OsStr>>(
 
     let result = unsafe { winsvc::StartServiceCtrlDispatcherW(service_table.as_ptr()) };
     if result == 0 {
-        Err(io::Error::last_os_error().into())
+        Err(Error::ServiceStartFailed(io::Error::last_os_error()))
     } else {
         Ok(())
     }

@@ -539,7 +539,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceStartFailed(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -557,7 +557,7 @@ impl Service {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
         };
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status)
         }
@@ -589,7 +589,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
         } else {
             unsafe {
                 let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
@@ -610,7 +610,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceControlFailed(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status)
         }
