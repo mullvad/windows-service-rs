@@ -6,7 +6,7 @@ use winapi::shared::winerror::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR};
 use winapi::um::winsvc;
 
 use crate::service::{ServiceControl, ServiceStatus};
-use crate::{ErrorKind, Result, ResultExt};
+use crate::{Error, Result};
 
 /// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]
@@ -18,11 +18,11 @@ impl ServiceStatusHandle {
     }
 
     /// Report the new service status to the system.
-    pub fn set_service_status(&self, service_status: ServiceStatus) -> io::Result<()> {
+    pub fn set_service_status(&self, service_status: ServiceStatus) -> Result<()> {
         let mut raw_service_status = service_status.to_raw();
         let result = unsafe { winsvc::SetServiceStatus(self.0, &mut raw_service_status) };
         if result == 0 {
-            Err(io::Error::last_os_error())
+            Err(Error::ServiceStatusFailed(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -104,7 +104,7 @@ where
     let context: *mut F = Box::into_raw(heap_event_handler);
 
     let service_name =
-        WideCString::from_str(service_name).chain_err(|| ErrorKind::InvalidServiceName)?;
+        WideCString::from_str(service_name).map_err(|_| Error::InvalidServiceName)?;
     let status_handle = unsafe {
         winsvc::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),
@@ -116,7 +116,7 @@ where
     if status_handle.is_null() {
         // Release the `event_handler` in case of an error.
         let _: Box<F> = unsafe { Box::from_raw(context) };
-        Err(io::Error::last_os_error().into())
+        Err(Error::ServiceRegisterFailed(io::Error::last_os_error()))
     } else {
         Ok(ServiceStatusHandle::from_handle(status_handle))
     }

@@ -4,7 +4,7 @@ use std::{io, ptr};
 use widestring::{WideCStr, WideCString};
 use winapi::um::winsvc;
 
-use crate::{ErrorKind, Result, ResultExt};
+use crate::{Error, Result};
 
 /// A macro to generate an entry point function (aka "service_main") for Windows service.
 ///
@@ -92,7 +92,7 @@ pub fn start<T: AsRef<OsStr>>(
     service_main: extern "system" fn(u32, *mut *mut u16),
 ) -> Result<()> {
     let service_name =
-        WideCString::from_str(service_name).chain_err(|| ErrorKind::InvalidServiceName)?;
+        WideCString::from_str(service_name).map_err(|_| Error::InvalidServiceName)?;
     let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[
         winsvc::SERVICE_TABLE_ENTRYW {
             lpServiceName: service_name.as_ptr(),
@@ -107,7 +107,7 @@ pub fn start<T: AsRef<OsStr>>(
 
     let result = unsafe { winsvc::StartServiceCtrlDispatcherW(service_table.as_ptr()) };
     if result == 0 {
-        Err(io::Error::last_os_error().into())
+        Err(Error::ServiceStartFailed(io::Error::last_os_error()))
     } else {
         Ok(())
     }

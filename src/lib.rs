@@ -30,7 +30,7 @@
 //! extern crate windows_service;
 //!
 //! use std::ffi::OsString;
-//! use windows_service::service_dispatcher;
+//! use windows_service::{Result, service_dispatcher};
 //!
 //! define_windows_service!(ffi_service_main, my_service_main);
 //!
@@ -39,7 +39,7 @@
 //!     // `service_dispatcher::start` from `main`.
 //! }
 //!
-//! fn main() -> Result<(), windows_service::Error> {
+//! fn main() -> Result<()> {
 //!     // Register generated `ffi_service_main` with the system and start the service, blocking
 //!     // this thread until the service is stopped.
 //!     service_dispatcher::start("myservice", ffi_service_main)?;
@@ -58,6 +58,7 @@
 //! use std::ffi::OsString;
 //! use windows_service::service::ServiceControl;
 //! use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+//! use windows_service::Result;
 //!
 //! fn my_service_main(arguments: Vec<OsString>) {
 //!     if let Err(_e) = run_service(arguments) {
@@ -65,7 +66,7 @@
 //!     }
 //! }
 //!
-//! fn run_service(arguments: Vec<OsString>) -> Result<(), windows_service::Error> {
+//! fn run_service(arguments: Vec<OsString>) -> Result<()> {
 //!     let event_handler = move |control_event| -> ServiceControlHandlerResult {
 //!         match control_event {
 //!             ServiceControl::Stop => {
@@ -172,81 +173,111 @@
 //! [`Running`]: service::ServiceState::Running
 
 #![cfg(windows)]
-// Because of how deeply error-chain recurse with this many error types.
-#![recursion_limit = "128"]
 
-#[macro_use]
-extern crate error_chain;
+pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(err_derive::Error, Debug)]
+pub enum Error {
+    /// Invalid account name.
+    #[error(display = "Invalid account name")]
+    InvalidAccountName,
 
+    /// Invalid account password.
+    #[error(display = "Invalid account password")]
+    InvalidAccountPassword,
 
-pub use error_chain::ChainedError;
+    /// Invalid display name.
+    #[error(display = "Invalid display name")]
+    InvalidDisplayName,
 
-error_chain! {
-    errors {
-        /// Invalid account name.
-        InvalidAccountName {
-            description("Invalid account name")
-        }
-        /// Invalid account password.
-        InvalidAccountPassword {
-            description("Invalid account password")
-        }
-        /// Invalid display name.
-        InvalidDisplayName {
-            description("Invalid display name")
-        }
-        /// Invalid database name.
-        InvalidDatabaseName {
-            description("Invalid database name")
-        }
-        /// Invalid executable path.
-        InvalidExecutablePath {
-            description("Invalid executable path")
-        }
-        /// Invalid launch arguments.
-        InvalidLaunchArgument {
-            description("Invalid launch argument")
-        }
-        /// Invalid dependency name.
-        InvalidDependency {
-            description("Invalid dependency name")
-        }
-        /// Invalid machine name.
-        InvalidMachineName {
-            description("Invalid machine name")
-        }
-        /// Invalid service name.
-        InvalidServiceName {
-            description("Invalid service name")
-        }
-        /// Invalid start argument.
-        InvalidStartArgument {
-            description("Invalid start argument")
-        }
-        /// Invalid raw representation of [`ServiceState`].
-        InvalidServiceState(raw_value: u32) {
-            description("Invalid service state")
-            display("Invalid service state value: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceControl`].
-        InvalidServiceControl(raw_value: u32) {
-            description("Invalid service control")
-            display("Invalid service control value: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceStartType`].
-        InvalidServiceStartType(raw_value: u32) {
-            description("Invalid service start type")
-            display("Invalid service start type: {}", raw_value)
-        }
-        /// Invalid raw representation of [`ServiceErrorControl`].
-        InvalidServiceErrorControl(raw_value: u32) {
-            description("Invalid service error control type")
-            display("Invalid service error control type: {}", raw_value)
-        }
-    }
-    foreign_links {
-        System(::std::io::Error) #[doc = "System call error"];
+    /// Invalid database name.
+    #[error(display = "Invalid database name")]
+    InvalidDatabaseName,
+
+    /// Invalid executable path.
+    #[error(display = "Invalid executable path")]
+    InvalidExecutablePath,
+
+    /// Invalid launch arguments.
+    #[error(display = "Invalid launch argument")]
+    InvalidLaunchArgument,
+
+    /// Invalid dependency name.
+    #[error(display = "Invalid dependency name")]
+    InvalidDependency,
+
+    /// Invalid machine name.
+    #[error(display = "Invalid machine name")]
+    InvalidMachineName,
+
+    /// Invalid service name.
+    #[error(display = "Invalid service name")]
+    InvalidServiceName,
+
+    /// Invalid start argument.
+    #[error(display = "Invalid start argument")]
+    InvalidStartArgument(#[error(cause)] widestring::NulError),
+
+    /// Invalid raw representation of [`ServiceState`].
+    #[error(display = "Invalid service state value: {}", _0)]
+    InvalidServiceState(u32),
+
+    /// Invalid raw representation of [`ServiceControl`].
+    #[error(display = "Invalid service control value: {}", _0)]
+    InvalidServiceControl(u32),
+
+    /// Invalid raw representation of [`ServiceStartType`].
+    #[error(display = "Invalid service start type: {}", _0)]
+    InvalidServiceStartType(u32),
+
+    /// Invalid raw representation of [`ServiceErrorControl`].
+    #[error(display = "Invalid service error control type: {}", _0)]
+    InvalidServiceErrorControl(u32),
+
+    /// A generic IO error
+    #[error(display = "An IO error has been encountered")]
+    IoError(#[error(cause)] std::io::Error),
+
+    /// Failed to send command to service Service deletion to start
+    #[error(display = "Could not send commands to service")]
+    ServiceControlFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to create service
+    #[error(display = "Could not create service")]
+    ServiceCreateFailed(#[error(cause)] std::io::Error),
+
+    /// Service deletion failed
+    #[error(display = "Could not delete service")]
+    ServiceDeleteFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to connect to service manager
+    #[error(display = "Could not connect to service manager")]
+    ServiceManagerConnectFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to open service
+    #[error(display = "Could not open service")]
+    ServiceOpenFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to query Service
+    #[error(display = "Could not query service")]
+    ServiceQueryFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to register service
+    #[error(display = "Could not register service")]
+    ServiceRegisterFailed(#[error(cause)] std::io::Error),
+
+    /// Service failed to start
+    #[error(display = "Could not start service")]
+    ServiceStartFailed(#[error(cause)] std::io::Error),
+
+    /// Failed to set service status
+    #[error(display = "Could not set service status")]
+    ServiceStatusFailed(#[error(cause)] std::io::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Error::IoError(error)
     }
 }
 

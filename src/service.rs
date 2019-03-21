@@ -10,12 +10,11 @@ use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
-use crate::double_nul_terminated;
 use crate::sc_handle::ScHandle;
-use crate::{ErrorKind, Result, ResultExt};
+use crate::{double_nul_terminated, Error, Result};
 
-/// Enum describing the types of Windows services.
 bitflags::bitflags! {
+    /// Enum describing the types of Windows services.
     pub struct ServiceType: DWORD {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = winnt::SERVICE_FILE_SYSTEM_DRIVER;
@@ -88,7 +87,7 @@ impl ServiceStartType {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(ErrorKind::InvalidServiceStartType(raw))?,
+            _ => Err(Error::InvalidServiceStartType(raw)),
         }
     }
 }
@@ -116,7 +115,7 @@ impl ServiceErrorControl {
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(ErrorKind::InvalidServiceErrorControl(raw))?,
+            _ => Err(Error::InvalidServiceErrorControl(raw)),
         }
     }
 }
@@ -289,21 +288,20 @@ pub enum ServiceControl {
 
 impl ServiceControl {
     pub fn from_raw(raw_value: u32) -> Result<Self> {
-        let service_control = match raw_value {
-            x if x == ServiceControl::Continue.to_raw() => ServiceControl::Continue,
-            x if x == ServiceControl::Interrogate.to_raw() => ServiceControl::Interrogate,
-            x if x == ServiceControl::NetBindAdd.to_raw() => ServiceControl::NetBindAdd,
-            x if x == ServiceControl::NetBindDisable.to_raw() => ServiceControl::NetBindDisable,
-            x if x == ServiceControl::NetBindEnable.to_raw() => ServiceControl::NetBindEnable,
-            x if x == ServiceControl::NetBindRemove.to_raw() => ServiceControl::NetBindRemove,
-            x if x == ServiceControl::ParamChange.to_raw() => ServiceControl::ParamChange,
-            x if x == ServiceControl::Pause.to_raw() => ServiceControl::Pause,
-            x if x == ServiceControl::Preshutdown.to_raw() => ServiceControl::Preshutdown,
-            x if x == ServiceControl::Shutdown.to_raw() => ServiceControl::Shutdown,
-            x if x == ServiceControl::Stop.to_raw() => ServiceControl::Stop,
-            other => Err(ErrorKind::InvalidServiceControl(other))?,
-        };
-        Ok(service_control)
+        match raw_value {
+            x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
+            x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
+            x if x == ServiceControl::NetBindAdd.to_raw() => Ok(ServiceControl::NetBindAdd),
+            x if x == ServiceControl::NetBindDisable.to_raw() => Ok(ServiceControl::NetBindDisable),
+            x if x == ServiceControl::NetBindEnable.to_raw() => Ok(ServiceControl::NetBindEnable),
+            x if x == ServiceControl::NetBindRemove.to_raw() => Ok(ServiceControl::NetBindRemove),
+            x if x == ServiceControl::ParamChange.to_raw() => Ok(ServiceControl::ParamChange),
+            x if x == ServiceControl::Pause.to_raw() => Ok(ServiceControl::Pause),
+            x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
+            x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
+            x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
+            other => Err(Error::InvalidServiceControl(other)),
+        }
     }
 
     pub fn to_raw(&self) -> u32 {
@@ -326,17 +324,16 @@ pub enum ServiceState {
 
 impl ServiceState {
     fn from_raw(raw_state: u32) -> Result<Self> {
-        let service_state = match raw_state {
-            x if x == ServiceState::Stopped.to_raw() => ServiceState::Stopped,
-            x if x == ServiceState::StartPending.to_raw() => ServiceState::StartPending,
-            x if x == ServiceState::StopPending.to_raw() => ServiceState::StopPending,
-            x if x == ServiceState::Running.to_raw() => ServiceState::Running,
-            x if x == ServiceState::ContinuePending.to_raw() => ServiceState::ContinuePending,
-            x if x == ServiceState::PausePending.to_raw() => ServiceState::PausePending,
-            x if x == ServiceState::Paused.to_raw() => ServiceState::Paused,
-            other => Err(ErrorKind::InvalidServiceState(other))?,
-        };
-        Ok(service_state)
+        match raw_state {
+            x if x == ServiceState::Stopped.to_raw() => Ok(ServiceState::Stopped),
+            x if x == ServiceState::StartPending.to_raw() => Ok(ServiceState::StartPending),
+            x if x == ServiceState::StopPending.to_raw() => Ok(ServiceState::StopPending),
+            x if x == ServiceState::Running.to_raw() => Ok(ServiceState::Running),
+            x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
+            x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
+            x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
+            other => Err(Error::InvalidServiceState(other)),
+        }
     }
 
     fn to_raw(&self) -> u32 {
@@ -527,8 +524,9 @@ impl Service {
     pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
-            .map(|s| WideCString::from_str(s).chain_err(|| ErrorKind::InvalidStartArgument))
+            .map(|s| WideCString::from_str(s).map_err(|e| Error::InvalidStartArgument(e)))
             .collect::<Result<Vec<WideCString>>>()?;
+
         let mut raw_service_arguments: Vec<*const u16> =
             wide_service_arguments.iter().map(|s| s.as_ptr()).collect();
 
@@ -541,7 +539,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceStartFailed(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -559,7 +557,7 @@ impl Service {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
         };
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status)
         }
@@ -591,7 +589,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
         } else {
             unsafe {
                 let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
@@ -612,13 +610,12 @@ impl Service {
         };
 
         if success == 0 {
-            Err(io::Error::last_os_error().into())
+            Err(Error::ServiceControlFailed(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status)
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
