@@ -91,8 +91,7 @@ pub fn start<T: AsRef<OsStr>>(
     service_name: T,
     service_main: extern "system" fn(u32, *mut *mut u16),
 ) -> Result<()> {
-    let service_name =
-        WideCString::from_str(service_name).map_err(|_| Error::InvalidServiceName)?;
+    let service_name = WideCString::from_str(service_name).map_err(Error::InvalidServiceName)?;
     let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[
         winsvc::SERVICE_TABLE_ENTRYW {
             lpServiceName: service_name.as_ptr(),

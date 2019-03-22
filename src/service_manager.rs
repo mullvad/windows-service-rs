@@ -44,8 +44,8 @@ impl ServiceManager {
         database: Option<D>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
-        let machine_name = to_wide(machine).map_err(|_| Error::InvalidMachineName)?;
-        let database_name = to_wide(database).map_err(|_| Error::InvalidDatabaseName)?;
+        let machine_name = to_wide(machine).map_err(Error::InvalidMachineName)?;
+        let database_name = to_wide(database).map_err(Error::InvalidDatabaseName)?;
         let handle = unsafe {
             winsvc::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
@@ -140,23 +140,22 @@ impl ServiceManager {
         service_access: ServiceAccess,
     ) -> Result<Service> {
         let service_name =
-            WideCString::from_str(service_info.name).map_err(|_| Error::InvalidServiceName)?;
-        let display_name = WideCString::from_str(service_info.display_name)
-            .map_err(|_| Error::InvalidDisplayName)?;
-        let account_name =
-            to_wide(service_info.account_name).map_err(|_| Error::InvalidAccountName)?;
+            WideCString::from_str(service_info.name).map_err(Error::InvalidServiceName)?;
+        let display_name =
+            WideCString::from_str(service_info.display_name).map_err(Error::InvalidDisplayName)?;
+        let account_name = to_wide(service_info.account_name).map_err(Error::InvalidAccountName)?;
         let account_password =
-            to_wide(service_info.account_password).map_err(|_| Error::InvalidAccountPassword)?;
+            to_wide(service_info.account_password).map_err(Error::InvalidAccountPassword)?;
 
         // escape executable path and arguments and combine them into single command
         let executable_path =
-            escape_wide(service_info.executable_path).map_err(|_| Error::InvalidExecutablePath)?;
+            escape_wide(service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
 
         let mut launch_command_buffer = WideString::new();
         launch_command_buffer.push(executable_path);
 
         for launch_argument in service_info.launch_arguments.iter() {
-            let wide = escape_wide(launch_argument).map_err(|_| Error::InvalidLaunchArgument)?;
+            let wide = escape_wide(launch_argument).map_err(Error::InvalidLaunchArgument)?;
 
             launch_command_buffer.push_str(" ");
             launch_command_buffer.push(wide);
@@ -170,7 +169,7 @@ impl ServiceManager {
             .map(|dependency| dependency.to_system_identifier())
             .collect();
         let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
-            .map_err(|_| Error::InvalidDependency)?;
+            .map_err(Error::InvalidDependency)?;
 
         let service_handle = unsafe {
             winsvc::CreateServiceW(
@@ -225,7 +224,7 @@ impl ServiceManager {
         name: T,
         request_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name = WideCString::from_str(name).map_err(|_| Error::InvalidServiceName)?;
+        let service_name = WideCString::from_str(name).map_err(Error::InvalidServiceName)?;
         let service_handle = unsafe {
             winsvc::OpenServiceW(
                 self.manager_handle.raw_handle(),

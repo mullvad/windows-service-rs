@@ -524,7 +524,7 @@ impl Service {
     pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
-            .map(|s| WideCString::from_str(s).map_err(|e| Error::InvalidStartArgument(e)))
+            .map(|s| WideCString::from_str(s).map_err(Error::InvalidStartArgument))
             .collect::<Result<Vec<WideCString>>>()?;
 
         let mut raw_service_arguments: Vec<*const u16> =

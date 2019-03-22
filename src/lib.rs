@@ -180,39 +180,39 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
-    InvalidAccountName,
+    InvalidAccountName(#[error(cause)] widestring::NulError),
 
     /// Invalid account password.
     #[error(display = "Invalid account password")]
-    InvalidAccountPassword,
+    InvalidAccountPassword(#[error(cause)] widestring::NulError),
 
     /// Invalid display name.
     #[error(display = "Invalid display name")]
-    InvalidDisplayName,
+    InvalidDisplayName(#[error(cause)] widestring::NulError),
 
     /// Invalid database name.
     #[error(display = "Invalid database name")]
-    InvalidDatabaseName,
+    InvalidDatabaseName(#[error(cause)] widestring::NulError),
 
     /// Invalid executable path.
     #[error(display = "Invalid executable path")]
-    InvalidExecutablePath,
+    InvalidExecutablePath(#[error(cause)] widestring::NulError),
 
     /// Invalid launch arguments.
     #[error(display = "Invalid launch argument")]
-    InvalidLaunchArgument,
+    InvalidLaunchArgument(#[error(cause)] widestring::NulError),
 
     /// Invalid dependency name.
     #[error(display = "Invalid dependency name")]
-    InvalidDependency,
+    InvalidDependency(#[error(cause)] widestring::NulError),
 
     /// Invalid machine name.
     #[error(display = "Invalid machine name")]
-    InvalidMachineName,
+    InvalidMachineName(#[error(cause)] widestring::NulError),
 
     /// Invalid service name.
     #[error(display = "Invalid service name")]
-    InvalidServiceName,
+    InvalidServiceName(#[error(cause)] widestring::NulError),
 
     /// Invalid start argument.
     #[error(display = "Invalid start argument")]
