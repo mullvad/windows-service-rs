@@ -82,12 +82,12 @@ impl ServiceStartType {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceStartType, TryFromIntError> {
+    pub fn from_raw(raw: u32) -> Result<ServiceStartType, ParseRawError> {
         match raw {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(TryFromIntError(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 }
@@ -109,13 +109,13 @@ impl ServiceErrorControl {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl, TryFromIntError> {
+    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl, ParseRawError> {
         match raw {
             x if x == ServiceErrorControl::Critical.to_raw() => Ok(ServiceErrorControl::Critical),
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(TryFromIntError(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 }
@@ -237,11 +237,8 @@ impl ServiceConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if the `dwServiceType` field does not represent a valid
-    /// [`ServiceStartType`].
-    pub unsafe fn from_raw(
-        raw: winsvc::QUERY_SERVICE_CONFIGW,
-    ) -> Result<ServiceConfig, TryFromIntError> {
+    /// Returns an error if a field inside the `QUERY_SERVICE_CONFIGW` does not have a valid value.
+    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
             .map(ServiceDependency::from_system_identifier)
@@ -263,8 +260,10 @@ impl ServiceConfig {
 
         Ok(ServiceConfig {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
-            start_type: ServiceStartType::from_raw(raw.dwStartType)?,
-            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
+            start_type: ServiceStartType::from_raw(raw.dwStartType)
+                .map_err(Error::InvalidServiceStartType)?,
+            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)
+                .map_err(Error::InvalidServiceErrorControl)?,
             executable_path: PathBuf::from(
                 WideCStr::from_ptr_str(raw.lpBinaryPathName).to_os_string(),
             ),
@@ -295,7 +294,7 @@ pub enum ServiceControl {
 }
 
 impl ServiceControl {
-    pub fn from_raw(raw: u32) -> Result<Self, TryFromIntError> {
+    pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
         match raw {
             x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
             x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
@@ -308,7 +307,7 @@ impl ServiceControl {
             x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
             x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
             x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
-            _ => Err(TryFromIntError(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 
@@ -331,7 +330,7 @@ pub enum ServiceState {
 }
 
 impl ServiceState {
-    fn from_raw(raw: u32) -> Result<Self, TryFromIntError> {
+    fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
         match raw {
             x if x == ServiceState::Stopped.to_raw() => Ok(ServiceState::Stopped),
             x if x == ServiceState::StartPending.to_raw() => Ok(ServiceState::StartPending),
@@ -340,7 +339,7 @@ impl ServiceState {
             x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
             x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
             x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
-            _ => Err(TryFromIntError(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 
@@ -490,7 +489,7 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw(raw: winsvc::SERVICE_STATUS) -> Result<Self, TryFromIntError> {
+    fn from_raw(raw: winsvc::SERVICE_STATUS) -> Result<Self, ParseRawError> {
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
             current_state: ServiceState::from_raw(raw.dwCurrentState)?,
@@ -604,7 +603,7 @@ impl Service {
         } else {
             unsafe {
                 let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
-                ServiceConfig::from_raw(*raw_config).map_err(Error::InvalidServiceStartType)
+                ServiceConfig::from_raw(*raw_config)
             }
         }
     }
@@ -630,7 +629,7 @@ impl Service {
 
 #[derive(err_derive::Error, Debug)]
 #[error(display = "Invalid integer value for the target type: {}", _0)]
-pub struct TryFromIntError(u32);
+pub struct ParseRawError(u32);
 
 #[cfg(test)]
 mod tests {

@@ -219,12 +219,16 @@ pub enum Error {
     InvalidStartArgument(#[error(cause)] widestring::NulError),
 
     /// Invalid raw representation of [`ServiceState`].
-    #[error(display = "Invalid service state value: {}", _0)]
-    InvalidServiceState(service::TryFromIntError),
+    #[error(display = "Invalid service state value")]
+    InvalidServiceState(#[error(cause)] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceStartType`].
-    #[error(display = "Invalid service start type: {}", _0)]
-    InvalidServiceStartType(service::TryFromIntError),
+    #[error(display = "Invalid service start value")]
+    InvalidServiceStartType(#[error(cause)] service::ParseRawError),
+
+    /// Invalid raw representation of [`ServiceErrorControl`].
+    #[error(display = "Invalid service error control value")]
+    InvalidServiceErrorControl(#[error(cause)] service::ParseRawError),
 
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]
