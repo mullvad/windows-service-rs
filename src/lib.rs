@@ -220,19 +220,11 @@ pub enum Error {
 
     /// Invalid raw representation of [`ServiceState`].
     #[error(display = "Invalid service state value: {}", _0)]
-    InvalidServiceState(u32),
-
-    /// Invalid raw representation of [`ServiceControl`].
-    #[error(display = "Invalid service control value: {}", _0)]
-    InvalidServiceControl(u32),
+    InvalidServiceState(service::TryFromIntError),
 
     /// Invalid raw representation of [`ServiceStartType`].
     #[error(display = "Invalid service start type: {}", _0)]
-    InvalidServiceStartType(u32),
-
-    /// Invalid raw representation of [`ServiceErrorControl`].
-    #[error(display = "Invalid service error control type: {}", _0)]
-    InvalidServiceErrorControl(u32),
+    InvalidServiceStartType(service::TryFromIntError),
 
     /// Failed to send command to service Service deletion to start
     #[error(display = "Could not send commands to service")]
