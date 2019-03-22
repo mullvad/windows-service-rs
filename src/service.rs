@@ -490,16 +490,14 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw(raw_status: winsvc::SERVICE_STATUS) -> Result<Self, TryFromIntError> {
+    fn from_raw(raw: winsvc::SERVICE_STATUS) -> Result<Self, TryFromIntError> {
         Ok(ServiceStatus {
-            service_type: ServiceType::from_bits_truncate(raw_status.dwServiceType),
-            current_state: ServiceState::from_raw(raw_status.dwCurrentState)?,
-            controls_accepted: ServiceControlAccept::from_bits_truncate(
-                raw_status.dwControlsAccepted,
-            ),
-            exit_code: ServiceExitCode::from(&raw_status),
-            checkpoint: raw_status.dwCheckPoint,
-            wait_hint: Duration::from_millis(raw_status.dwWaitHint as u64),
+            service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
+            current_state: ServiceState::from_raw(raw.dwCurrentState)?,
+            controls_accepted: ServiceControlAccept::from_bits_truncate(raw.dwControlsAccepted),
+            exit_code: ServiceExitCode::from(&raw),
+            checkpoint: raw.dwCheckPoint,
+            wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
         })
     }
 }
@@ -552,7 +550,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceStartFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -570,17 +568,17 @@ impl Service {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
         };
         if success == 0 {
-            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
         }
     }
 
     /// Delete the service from system registry.
-    pub fn delete(self) -> io::Result<()> {
+    pub fn delete(self) -> crate::Result<()> {
         let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
-            Err(io::Error::last_os_error())
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -602,7 +600,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             unsafe {
                 let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
@@ -623,7 +621,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceControlFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
         }

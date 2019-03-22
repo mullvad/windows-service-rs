@@ -226,41 +226,9 @@ pub enum Error {
     #[error(display = "Invalid service start type: {}", _0)]
     InvalidServiceStartType(service::TryFromIntError),
 
-    /// Failed to send command to service Service deletion to start
-    #[error(display = "Could not send commands to service")]
-    ServiceControlFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to create service
-    #[error(display = "Could not create service")]
-    ServiceCreateFailed(#[error(cause)] std::io::Error),
-
-    /// Service deletion failed
-    #[error(display = "Could not delete service")]
-    ServiceDeleteFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to connect to service manager
-    #[error(display = "Could not connect to service manager")]
-    ServiceManagerConnectFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to open service
-    #[error(display = "Could not open service")]
-    ServiceOpenFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to query Service
-    #[error(display = "Could not query service")]
-    ServiceQueryFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to register service
-    #[error(display = "Could not register service")]
-    ServiceRegisterFailed(#[error(cause)] std::io::Error),
-
-    /// Service failed to start
-    #[error(display = "Could not start service")]
-    ServiceStartFailed(#[error(cause)] std::io::Error),
-
-    /// Failed to set service status
-    #[error(display = "Could not set service status")]
-    ServiceStatusFailed(#[error(cause)] std::io::Error),
+    /// IO error when calling winapi
+    #[error(display = "IO error in winapi call")]
+    Winapi(#[error(cause)] std::io::Error),
 }
 
 mod sc_handle;
