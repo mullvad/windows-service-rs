@@ -564,10 +564,10 @@ impl Service {
     }
 
     /// Delete the service from system registry.
-    pub fn delete(self) -> io::Result<()> {
+    pub fn delete(self) -> Result<()> {
         let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
-            Err(io::Error::last_os_error())
+            Err(Error::ServiceDeleteFailed(io::Error::last_os_error()))
         } else {
             Ok(())
         }

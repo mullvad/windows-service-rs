@@ -234,10 +234,6 @@ pub enum Error {
     #[error(display = "Invalid service error control type: {}", _0)]
     InvalidServiceErrorControl(u32),
 
-    /// A generic IO error
-    #[error(display = "An IO error has been encountered")]
-    IoError(#[error(cause)] std::io::Error),
-
     /// Failed to send command to service Service deletion to start
     #[error(display = "Could not send commands to service")]
     ServiceControlFailed(#[error(cause)] std::io::Error),
@@ -273,12 +269,6 @@ pub enum Error {
     /// Failed to set service status
     #[error(display = "Could not set service status")]
     ServiceStatusFailed(#[error(cause)] std::io::Error),
-}
-
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        Error::IoError(error)
-    }
 }
 
 mod sc_handle;
