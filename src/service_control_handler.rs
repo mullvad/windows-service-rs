@@ -103,8 +103,7 @@ where
     // Important: leak the Box<F> which will be released in `service_control_handler`.
     let context: *mut F = Box::into_raw(heap_event_handler);
 
-    let service_name =
-        WideCString::from_str(service_name).map_err(|_| Error::InvalidServiceName)?;
+    let service_name = WideCString::from_str(service_name).map_err(Error::InvalidServiceName)?;
     let status_handle = unsafe {
         winsvc::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),

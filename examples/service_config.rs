@@ -1,11 +1,10 @@
 #[cfg(windows)]
-extern crate windows_service;
-
-#[cfg(windows)]
 fn main() -> windows_service::Result<()> {
     use std::env;
-    use windows_service::service::ServiceAccess;
-    use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    use windows_service::{
+        service::ServiceAccess,
+        service_manager::{ServiceManager, ServiceManagerAccess},
+    };
 
     let service_name = env::args().nth(1).unwrap_or("netlogon".to_owned());
 
