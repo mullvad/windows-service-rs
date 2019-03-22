@@ -1,12 +1,10 @@
 #[cfg(windows)]
-extern crate windows_service;
-
-#[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use std::thread;
-    use std::time::Duration;
-    use windows_service::service::{ServiceAccess, ServiceState};
-    use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    use std::{thread, time::Duration};
+    use windows_service::{
+        service::{ServiceAccess, ServiceState},
+        service_manager::{ServiceManager, ServiceManagerAccess},
+    };
 
     let manager_access = ServiceManagerAccess::CONNECT;
     let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;

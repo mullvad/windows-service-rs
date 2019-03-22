@@ -11,10 +11,6 @@
 //
 // Ping server sends a text message to local UDP port 1234 once a second.
 // You can verify that service works by running netcat, i.e: `ncat -ul 1234`.
-//
-#[cfg(windows)]
-#[macro_use]
-extern crate windows_service;
 
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
@@ -28,26 +24,28 @@ fn main() {
 
 #[cfg(windows)]
 mod ping_service {
-    use std::ffi::OsString;
-    use std::net::{IpAddr, SocketAddr, UdpSocket};
-    use std::sync::mpsc;
-    use std::time::Duration;
-
-    use windows_service::service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType,
+    use std::{
+        ffi::OsString,
+        net::{IpAddr, SocketAddr, UdpSocket},
+        sync::mpsc,
+        time::Duration,
     };
-    use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
-    use windows_service::service_dispatcher;
-    use windows_service::Result;
+    use windows_service::{
+        define_windows_service,
+        service::{
+            ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+            ServiceType,
+        },
+        service_control_handler::{self, ServiceControlHandlerResult},
+        service_dispatcher, Result,
+    };
 
-
-    const SERVICE_NAME: &'static str = "ping_service";
+    const SERVICE_NAME: &str = "ping_service";
     const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
     const LOOPBACK_ADDR: [u8; 4] = [127, 0, 0, 1];
     const RECEIVER_PORT: u16 = 1234;
-    const PING_MESSAGE: &'static str = "ping\n";
+    const PING_MESSAGE: &str = "ping\n";
 
     pub fn run() -> Result<()> {
         // Register generated `ffi_service_main` with the system and start the service, blocking
