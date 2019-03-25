@@ -18,11 +18,11 @@ impl ServiceStatusHandle {
     }
 
     /// Report the new service status to the system.
-    pub fn set_service_status(&self, service_status: ServiceStatus) -> Result<()> {
+    pub fn set_service_status(&self, service_status: ServiceStatus) -> crate::Result<()> {
         let mut raw_service_status = service_status.to_raw();
         let result = unsafe { winsvc::SetServiceStatus(self.0, &mut raw_service_status) };
         if result == 0 {
-            Err(Error::ServiceStatusFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(())
         }
@@ -115,7 +115,7 @@ where
     if status_handle.is_null() {
         // Release the `event_handler` in case of an error.
         let _: Box<F> = unsafe { Box::from_raw(context) };
-        Err(Error::ServiceRegisterFailed(io::Error::last_os_error()))
+        Err(Error::Winapi(io::Error::last_os_error()))
     } else {
         Ok(ServiceStatusHandle::from_handle(status_handle))
     }

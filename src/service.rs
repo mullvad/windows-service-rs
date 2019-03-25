@@ -11,7 +11,7 @@ use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::{winnt, winsvc};
 
 use crate::sc_handle::ScHandle;
-use crate::{double_nul_terminated, Error, Result};
+use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
@@ -82,12 +82,12 @@ impl ServiceStartType {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceStartType> {
+    pub fn from_raw(raw: u32) -> Result<ServiceStartType, ParseRawError> {
         match raw {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(Error::InvalidServiceStartType(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 }
@@ -109,13 +109,13 @@ impl ServiceErrorControl {
         *self as u32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl> {
+    pub fn from_raw(raw: u32) -> Result<ServiceErrorControl, ParseRawError> {
         match raw {
             x if x == ServiceErrorControl::Critical.to_raw() => Ok(ServiceErrorControl::Critical),
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(Error::InvalidServiceErrorControl(raw)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 }
@@ -233,7 +233,12 @@ pub struct ServiceConfig {
 }
 
 impl ServiceConfig {
-    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> Result<ServiceConfig> {
+    /// Tries to parse a `QUERY_SERVICE_CONFIGW` into Rust [`ServiceConfig`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a field inside the `QUERY_SERVICE_CONFIGW` does not have a valid value.
+    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
             .map(ServiceDependency::from_system_identifier)
@@ -255,8 +260,10 @@ impl ServiceConfig {
 
         Ok(ServiceConfig {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
-            start_type: ServiceStartType::from_raw(raw.dwStartType)?,
-            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)?,
+            start_type: ServiceStartType::from_raw(raw.dwStartType)
+                .map_err(Error::InvalidServiceStartType)?,
+            error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)
+                .map_err(Error::InvalidServiceErrorControl)?,
             executable_path: PathBuf::from(
                 WideCStr::from_ptr_str(raw.lpBinaryPathName).to_os_string(),
             ),
@@ -287,8 +294,8 @@ pub enum ServiceControl {
 }
 
 impl ServiceControl {
-    pub fn from_raw(raw_value: u32) -> Result<Self> {
-        match raw_value {
+    pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
+        match raw {
             x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
             x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
             x if x == ServiceControl::NetBindAdd.to_raw() => Ok(ServiceControl::NetBindAdd),
@@ -300,7 +307,7 @@ impl ServiceControl {
             x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
             x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
             x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
-            other => Err(Error::InvalidServiceControl(other)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 
@@ -323,8 +330,8 @@ pub enum ServiceState {
 }
 
 impl ServiceState {
-    fn from_raw(raw_state: u32) -> Result<Self> {
-        match raw_state {
+    fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
+        match raw {
             x if x == ServiceState::Stopped.to_raw() => Ok(ServiceState::Stopped),
             x if x == ServiceState::StartPending.to_raw() => Ok(ServiceState::StartPending),
             x if x == ServiceState::StopPending.to_raw() => Ok(ServiceState::StopPending),
@@ -332,7 +339,7 @@ impl ServiceState {
             x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
             x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
             x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
-            other => Err(Error::InvalidServiceState(other)),
+            _ => Err(ParseRawError(raw)),
         }
     }
 
@@ -477,16 +484,19 @@ impl ServiceStatus {
         raw_status
     }
 
-    fn from_raw(raw_status: winsvc::SERVICE_STATUS) -> Result<Self> {
+    /// Tries to parse a `SERVICE_STATUS` into a Rust [`ServiceStatus`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
+    fn from_raw(raw: winsvc::SERVICE_STATUS) -> Result<Self, ParseRawError> {
         Ok(ServiceStatus {
-            service_type: ServiceType::from_bits_truncate(raw_status.dwServiceType),
-            current_state: ServiceState::from_raw(raw_status.dwCurrentState)?,
-            controls_accepted: ServiceControlAccept::from_bits_truncate(
-                raw_status.dwControlsAccepted,
-            ),
-            exit_code: ServiceExitCode::from(&raw_status),
-            checkpoint: raw_status.dwCheckPoint,
-            wait_hint: Duration::from_millis(raw_status.dwWaitHint as u64),
+            service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
+            current_state: ServiceState::from_raw(raw.dwCurrentState)?,
+            controls_accepted: ServiceControlAccept::from_bits_truncate(raw.dwControlsAccepted),
+            exit_code: ServiceExitCode::from(&raw),
+            checkpoint: raw.dwCheckPoint,
+            wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
         })
     }
 }
@@ -521,11 +531,11 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
+    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> crate::Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
             .map(|s| WideCString::from_str(s).map_err(Error::InvalidStartArgument))
-            .collect::<Result<Vec<WideCString>>>()?;
+            .collect::<crate::Result<Vec<WideCString>>>()?;
 
         let mut raw_service_arguments: Vec<*const u16> =
             wide_service_arguments.iter().map(|s| s.as_ptr()).collect();
@@ -539,42 +549,42 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceStartFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(())
         }
     }
 
     /// Stop the service.
-    pub fn stop(&self) -> Result<ServiceStatus> {
+    pub fn stop(&self) -> crate::Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Stop)
     }
 
     /// Get the service status from the system.
-    pub fn query_status(&self) -> Result<ServiceStatus> {
+    pub fn query_status(&self) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         let success = unsafe {
             winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
         };
         if success == 0 {
-            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw(raw_status)
+            ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
         }
     }
 
     /// Delete the service from system registry.
-    pub fn delete(self) -> Result<()> {
+    pub fn delete(self) -> crate::Result<()> {
         let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
-            Err(Error::ServiceDeleteFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(())
         }
     }
 
     /// Get the service config from the system.
-    pub fn query_config(&self) -> Result<ServiceConfig> {
+    pub fn query_config(&self) -> crate::Result<ServiceConfig> {
         // As per docs, the maximum size of data buffer used by QueryServiceConfigW is 8K
         let mut data = [0u8; 8096];
         let mut bytes_written: u32 = 0;
@@ -589,7 +599,7 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceQueryFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             unsafe {
                 let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
@@ -599,7 +609,7 @@ impl Service {
     }
 
     /// Private helper to send the control commands to the system.
-    fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus> {
+    fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
         let success = unsafe {
             winsvc::ControlService(
@@ -610,12 +620,16 @@ impl Service {
         };
 
         if success == 0 {
-            Err(Error::ServiceControlFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw(raw_status)
+            ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
         }
     }
 }
+
+#[derive(err_derive::Error, Debug)]
+#[error(display = "Invalid integer value for the target type: {}", _0)]
+pub struct ParseRawError(u32);
 
 #[cfg(test)]
 mod tests {

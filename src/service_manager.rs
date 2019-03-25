@@ -55,9 +55,7 @@ impl ServiceManager {
         };
 
         if handle.is_null() {
-            Err(Error::ServiceManagerConnectFailed(
-                io::Error::last_os_error(),
-            ))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(ServiceManager {
                 manager_handle: unsafe { ScHandle::new(handle) },
@@ -161,7 +159,8 @@ impl ServiceManager {
             launch_command_buffer.push(wide);
         }
 
-        let launch_command = WideCString::from_wide_str(launch_command_buffer).unwrap();
+        let launch_command = WideCString::from_wide_str(launch_command_buffer)
+            .expect("launch_command_buffer invalidly formatted");
 
         let dependency_identifiers: Vec<OsString> = service_info
             .dependencies
@@ -194,7 +193,7 @@ impl ServiceManager {
         };
 
         if service_handle.is_null() {
-            Err(Error::ServiceCreateFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
@@ -234,7 +233,7 @@ impl ServiceManager {
         };
 
         if service_handle.is_null() {
-            Err(Error::ServiceOpenFailed(io::Error::last_os_error()))
+            Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
