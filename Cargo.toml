@@ -1,6 +1,6 @@
 [package]
 name = "windows-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "A crate that provides facilities for management and implementation of windows services"
 readme = "README.md"
 authors = ["Mullvad VPN <admin@mullvad.net>", "Andrej Mihajlov <and@mullvad.net>", "Linus Färnstrand <linus@mullvad.net>"]
