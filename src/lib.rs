@@ -230,6 +230,18 @@ pub enum Error {
     #[error(display = "Invalid service error control value")]
     InvalidServiceErrorControl(#[error(cause)] service::ParseRawError),
 
+    /// Invalid raw representation of [`ServiceActionType`]
+    #[error(display = "Invalid service action type")]
+    InvalidServiceActionType(#[error(cause)] service::ParseRawError),
+
+    /// Invalid reboot message
+    #[error(display = "Invalid service action failures reboot message")]
+    InvalidServiceActionFailuresRebootMessage(#[error(cause)] widestring::NulError),
+
+    /// Invalid command
+    #[error(display = "Invalid service action failures command")]
+    InvalidServiceActionFailuresCommand(#[error(cause)] widestring::NulError),
+
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]
     Winapi(#[error(cause)] std::io::Error),
