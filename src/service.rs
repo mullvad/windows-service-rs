@@ -5,9 +5,10 @@ use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
 
-use widestring::{WideCStr, WideCString};
+use widestring::{NulError, WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
+use winapi::um::winbase::INFINITE;
 use winapi::um::{winnt, winsvc};
 
 use crate::sc_handle::ScHandle;
@@ -62,6 +63,9 @@ bitflags::bitflags! {
 
         /// Can query the services configuration
         const QUERY_CONFIG = winsvc::SERVICE_QUERY_CONFIG;
+
+        /// Can change the services configuration
+        const CHANGE_CONFIG = winsvc::SERVICE_CHANGE_CONFIG;
     }
 }
 
@@ -155,6 +159,152 @@ impl ServiceDependency {
             let service_name = OsString::from_wide(&chars);
             ServiceDependency::Service(service_name)
         }
+    }
+}
+
+/// Enum describing the types of actions that the service control manager can perform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum ServiceActionType {
+    None = winsvc::SC_ACTION_NONE,
+    Reboot = winsvc::SC_ACTION_REBOOT,
+    Restart = winsvc::SC_ACTION_RESTART,
+    RunCommand = winsvc::SC_ACTION_RUN_COMMAND,
+}
+
+impl ServiceActionType {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<ServiceActionType, ParseRawError> {
+        match raw {
+            x if x == ServiceActionType::None.to_raw() => Ok(ServiceActionType::None),
+            x if x == ServiceActionType::Reboot.to_raw() => Ok(ServiceActionType::Reboot),
+            x if x == ServiceActionType::Restart.to_raw() => Ok(ServiceActionType::Restart),
+            x if x == ServiceActionType::RunCommand.to_raw() => Ok(ServiceActionType::RunCommand),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Represents an action that the service control manager can perform.
+///
+/// See <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-sc_action>
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServiceAction {
+    /// The action to be performed.
+    pub action_type: ServiceActionType,
+
+    /// The time to wait before performing the specified action
+    pub delay: Duration,
+}
+
+impl ServiceAction {
+    pub fn from_raw(raw: winsvc::SC_ACTION) -> crate::Result<ServiceAction> {
+        Ok(ServiceAction {
+            action_type: ServiceActionType::from_raw(raw.Type)
+                .map_err(Error::InvalidServiceActionType)?,
+            delay: Duration::from_secs(raw.Delay as u64),
+        })
+    }
+
+    pub fn to_raw(&self) -> winsvc::SC_ACTION {
+        winsvc::SC_ACTION {
+            Type: self.action_type.to_raw(),
+            Delay: self.delay.as_secs() as DWORD,
+        }
+    }
+}
+
+/// A enum that representats the reset period for the failure counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ServiceFailureResetPeriod {
+    Never,
+    After(Duration),
+}
+
+impl ServiceFailureResetPeriod {
+    pub fn from_raw(raw: DWORD) -> ServiceFailureResetPeriod {
+        match raw {
+            INFINITE => ServiceFailureResetPeriod::Never,
+            _ => ServiceFailureResetPeriod::After(Duration::from_secs(raw as u64)),
+        }
+    }
+
+    pub fn to_raw(&self) -> DWORD {
+        match self {
+            ServiceFailureResetPeriod::Never => INFINITE,
+            ServiceFailureResetPeriod::After(ref duration) => duration.as_secs() as DWORD,
+        }
+    }
+}
+
+/// A struct that describes the action that should be performed on the system service crash.
+///
+/// Please refer to MSDN for more info:\
+/// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-_service_failure_actionsw>
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServiceFailureActions {
+    /// The time after which to reset the failure count to zero if there are no failures, in
+    /// seconds.
+    pub reset_period: ServiceFailureResetPeriod,
+
+    /// The message to be broadcast to server users before rebooting in response to the
+    /// `SC_ACTION_REBOOT` service controller action.
+    ///
+    /// If this value is `None`, the reboot message is unchanged.
+    /// If the value is an empty string, the reboot message is deleted and no message is broadcast.
+    pub reboot_msg: Option<OsString>,
+
+    /// The command line to execute in response to the `SC_ACTION_RUN_COMMAND` service controller
+    /// action. This process runs under the same account as the service.
+    ///
+    /// If this value is `None`, the command is unchanged. If the value is an empty string, the
+    /// command is deleted and no program is run when the service fails.
+    pub command: Option<OsString>,
+
+    /// The array of actions to perform.
+    /// If this value is `None`, the [`ServiceFailureActions::reset_period`] member is ignored.
+    pub actions: Option<Vec<ServiceAction>>,
+}
+
+impl ServiceFailureActions {
+    /// Tries to parse a `SERVICE_FAILURE_ACTIONSW` into Rust [`ServiceFailureActions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a field inside the `SERVICE_FAILURE_ACTIONSW` does not have a valid
+    /// value.
+    pub unsafe fn from_raw(
+        raw: winsvc::SERVICE_FAILURE_ACTIONSW,
+    ) -> crate::Result<ServiceFailureActions> {
+        let reboot_msg = ptr::NonNull::new(raw.lpRebootMsg)
+            .map(|wrapped_ptr| WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string());
+        let command = ptr::NonNull::new(raw.lpCommand)
+            .map(|wrapped_ptr| WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string());
+        let reset_period = ServiceFailureResetPeriod::from_raw(raw.dwResetPeriod);
+
+        let actions: Option<Vec<ServiceAction>> = if raw.lpsaActions.is_null() {
+            None
+        } else {
+            Some(
+                (0..raw.cActions)
+                    .map(|i| {
+                        let array_element_ptr: *mut winsvc::SC_ACTION =
+                            raw.lpsaActions.offset(i as isize);
+                        ServiceAction::from_raw(*array_element_ptr)
+                    })
+                    .collect::<crate::Result<Vec<ServiceAction>>>()?,
+            )
+        };
+
+        Ok(ServiceFailureActions {
+            reset_period,
+            reboot_msg,
+            command,
+            actions,
+        })
     }
 }
 
@@ -608,6 +758,140 @@ impl Service {
         }
     }
 
+    /// Configure failure actions to run when the service terminates before reporting the
+    /// [`ServiceState::Stopped`] back to the system or if it exits with non-zero
+    /// [`ServiceExitCode`].
+    ///
+    /// Please refer to MSDN for more info:\
+    /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-_service_failure_actions_flag>
+    pub fn set_failure_actions_on_non_crash_failures(&self, enabled: bool) -> crate::Result<()> {
+        let mut raw_failure_actions_flag =
+            unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONS_FLAG>() };
+
+        raw_failure_actions_flag.fFailureActionsOnNonCrashFailures = if enabled { 1 } else { 0 };
+
+        unsafe {
+            self.change_config2(
+                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG,
+                &mut raw_failure_actions_flag,
+            )
+            .map_err(Error::Winapi)
+        }
+    }
+
+    /// Query the system for the boolean indication that the service is configured to run failure
+    /// actions on non-crash failures.
+    pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
+        let mut data = [0u8; 8096];
+
+        let raw_failure_actions_flag: winsvc::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
+            self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
+                .map_err(Error::Winapi)?
+        };
+
+        let result = if raw_failure_actions_flag.fFailureActionsOnNonCrashFailures == 0 {
+            false
+        } else {
+            true
+        };
+
+        Ok(result)
+    }
+
+    /// Query the configured failure actions for the service.
+    pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
+        unsafe {
+            let mut data = [0u8; 8096];
+
+            let raw_failure_actions: winsvc::SERVICE_FAILURE_ACTIONSW = self
+                .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
+                .map_err(Error::Winapi)?;
+
+            ServiceFailureActions::from_raw(raw_failure_actions)
+        }
+    }
+
+    /// Update failure actions.
+    ///
+    /// Pass `None` for optional fields to keep the corresponding fields unchanged, or pass an empty
+    /// value to reset them.
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use std::ffi::OsString;
+    /// use std::time::Duration;
+    /// use windows_service::service::{
+    ///     ServiceAccess, ServiceAction, ServiceActionType, ServiceFailureActions,
+    ///     ServiceFailureResetPeriod,
+    /// };
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service(
+    ///     "my_service",
+    ///     ServiceAccess::START | ServiceAccess::CHANGE_CONFIG,
+    /// )?;
+    ///
+    /// let actions = vec![
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::Restart,
+    ///         delay: Duration::from_secs(5),
+    ///     },
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::RunCommand,
+    ///         delay: Duration::from_secs(10),
+    ///     },
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::None,
+    ///         delay: Duration::default(),
+    ///     },
+    /// ];
+    ///
+    /// let failure_actions = ServiceFailureActions {
+    ///     reset_period: ServiceFailureResetPeriod::After(Duration::from_secs(86400)),
+    ///     reboot_msg: None,
+    ///     command: Some(OsString::from("ping 127.0.0.1")),
+    ///     actions: Some(actions),
+    /// };
+    ///
+    /// my_service.update_failure_actions(failure_actions)?;
+    /// #    Ok(())
+    /// # }
+    /// ```
+    pub fn update_failure_actions(&self, update: ServiceFailureActions) -> crate::Result<()> {
+        let mut raw_failure_actions = unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONSW>() };
+
+        let mut reboot_msg = to_wide_slice(update.reboot_msg)
+            .map_err(Error::InvalidServiceActionFailuresRebootMessage)?;
+        let mut command =
+            to_wide_slice(update.command).map_err(Error::InvalidServiceActionFailuresCommand)?;
+        let mut sc_actions: Option<Vec<winsvc::SC_ACTION>> = update
+            .actions
+            .map(|actions| actions.iter().map(ServiceAction::to_raw).collect());
+
+        raw_failure_actions.dwResetPeriod = update.reset_period.to_raw();
+        raw_failure_actions.lpRebootMsg = reboot_msg
+            .as_mut()
+            .map_or(ptr::null_mut(), |s| s.as_mut_ptr());
+        raw_failure_actions.lpCommand =
+            command.as_mut().map_or(ptr::null_mut(), |s| s.as_mut_ptr());
+        raw_failure_actions.cActions = sc_actions.as_ref().map_or(0, |v| v.len()) as u32;
+        raw_failure_actions.lpsaActions = sc_actions
+            .as_mut()
+            .map_or(ptr::null_mut(), |actions| actions.as_mut_ptr());
+
+        unsafe {
+            self.change_config2(
+                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS,
+                &mut raw_failure_actions,
+            )
+            .map_err(Error::Winapi)
+        }
+    }
+
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
@@ -625,7 +909,55 @@ impl Service {
             ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
         }
     }
+
+    /// Private helper to query the optional configuration parameters of windows services.
+    /// As per docs, the maximum size of data buffer used by QueryServiceConfig2W is 8K
+    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; 8096]) -> io::Result<T> {
+        let mut bytes_written: u32 = 0;
+
+        let success = winsvc::QueryServiceConfig2W(
+            self.service_handle.raw_handle(),
+            kind,
+            data.as_mut_ptr() as _,
+            data.len() as u32,
+            &mut bytes_written,
+        );
+
+        if success == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(*(data.as_ptr() as *const _))
+        }
+    }
+
+    /// Private helper to update the optional configuration parameters of windows services.
+    unsafe fn change_config2<T>(&self, kind: DWORD, data: &mut T) -> io::Result<()> {
+        let success = winsvc::ChangeServiceConfig2W(
+            self.service_handle.raw_handle(),
+            kind,
+            data as *mut _ as *mut _,
+        );
+
+        if success == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
 }
+
+fn to_wide_slice<T: AsRef<OsStr>>(
+    s: Option<T>,
+) -> ::std::result::Result<Option<Vec<u16>>, NulError> {
+    if let Some(s) = s {
+        Ok(Some(
+            WideCString::from_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
+        ))
+    } else {
+        Ok(None)
+    }
+}
+
 
 #[derive(err_derive::Error, Debug)]
 #[error(display = "Invalid integer value for the target type: {}", _0)]
