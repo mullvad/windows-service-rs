@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
@@ -9,7 +10,7 @@ use widestring::{NulError, WideCStr, WideCString};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
-use winapi::um::{winnt, winsvc};
+use winapi::um::{dbt, winnt, winsvc, winuser};
 
 use crate::sc_handle::ScHandle;
 use crate::{double_nul_terminated, Error};
@@ -426,43 +427,224 @@ impl ServiceConfig {
     }
 }
 
+/// Enum describing the event type of DeviceEvent
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DeviceEventParam {
+    DeviceArrival(*mut dbt::DEV_BROADCAST_HDR),
+    DeviceQueryRemove(*mut dbt::DEV_BROADCAST_HDR),
+    DeviceQueryRemoveFailed(*mut dbt::DEV_BROADCAST_HDR),
+    DeviceRemoveComplete(*mut dbt::DEV_BROADCAST_HDR),
+    DeviceRemovePending(*mut dbt::DEV_BROADCAST_HDR),
+    CustomEvent(*mut dbt::DEV_BROADCAST_HDR),
+ }
+
+impl DeviceEventParam {
+    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+        match event_type as usize {
+            dbt::DBT_DEVICEARRIVAL => Ok(DeviceEventParam::DeviceArrival(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            dbt::DBT_DEVICEREMOVECOMPLETE => Ok(DeviceEventParam::DeviceRemoveComplete(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            dbt::DBT_DEVICEQUERYREMOVE => Ok(DeviceEventParam::DeviceQueryRemove(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            dbt::DBT_DEVICEQUERYREMOVEFAILED => Ok(DeviceEventParam::DeviceQueryRemoveFailed(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            dbt::DBT_DEVICEREMOVEPENDING => Ok(DeviceEventParam::DeviceRemovePending(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            dbt::DBT_CUSTOMEVENT => Ok(DeviceEventParam::CustomEvent(
+                event_data as *mut dbt::DEV_BROADCAST_HDR,
+            )),
+            _ => Err(ParseRawError(event_type)),
+        }
+    }
+ }
+
+/// Enum describing the event type of HardwareProfileChange
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HardwareProfileChangeParam {
+    ConfigChanged,
+    QueryChangeConfig,
+    ConfigChangeCanceled,
+}
+
+impl HardwareProfileChangeParam {
+    pub fn from_event(event_type: u32) -> Result<Self, ParseRawError> {
+        match event_type as usize {
+            dbt::DBT_CONFIGCHANGED => Ok(HardwareProfileChangeParam::ConfigChanged),
+            dbt::DBT_QUERYCHANGECONFIG => Ok(HardwareProfileChangeParam::QueryChangeConfig),
+            dbt::DBT_CONFIGCHANGECANCELED => Ok(HardwareProfileChangeParam::ConfigChangeCanceled),
+            _ => Err(ParseRawError(event_type)),
+        }
+    }
+}
+
+/// Enum describing the event type of PowerEvent
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerEventParam {
+    PowerStatusChange,
+    ResumeAutomatic,
+    ResumeSuspend,
+    Suspend,
+    PowerSettingChange(*mut winuser::POWERBROADCAST_SETTING),
+    BatteryLow,
+    OemEvent,
+    QuerySuspend,
+    QuerySuspendFailed,
+    ResumeCritical,
+}
+
+impl PowerEventParam {
+    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+        match event_type as usize {
+            winuser::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
+            winuser::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
+            winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
+            winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
+            winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
+                event_data as *mut winuser::POWERBROADCAST_SETTING,
+            )),
+            winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
+            winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
+            winuser::PBT_APMQUERYSUSPEND => Ok(PowerEventParam::QuerySuspend),
+            winuser::PBT_APMQUERYSUSPENDFAILED => Ok(PowerEventParam::QuerySuspendFailed),
+            winuser::PBT_APMRESUMECRITICAL => Ok(PowerEventParam::ResumeCritical),
+            _ => Err(ParseRawError(event_type)),
+        }
+    }
+}
+
+/// Enum describing the event type of SessionChange
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SessionChangeParam {
+    ConsoleConnect(*mut winuser::WTSSESSION_NOTIFICATION),
+    ConsoleDisconnect(*mut winuser::WTSSESSION_NOTIFICATION),
+    RemoteConnect(*mut winuser::WTSSESSION_NOTIFICATION),
+    RemoteDisconnect(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionLogon(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionLogoff(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionLock(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionUnlock(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionRemoteControl(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionCreate(*mut winuser::WTSSESSION_NOTIFICATION),
+    SessionTerminate(*mut winuser::WTSSESSION_NOTIFICATION),
+}
+
+impl SessionChangeParam {
+    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+        match event_type as usize {
+            winuser::WTS_CONSOLE_CONNECT => Ok(SessionChangeParam::ConsoleConnect(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_CONSOLE_DISCONNECT => Ok(SessionChangeParam::ConsoleDisconnect(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_REMOTE_CONNECT => Ok(SessionChangeParam::RemoteConnect(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_REMOTE_DISCONNECT => Ok(SessionChangeParam::RemoteDisconnect(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_LOGON => Ok(SessionChangeParam::SessionLogon(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_LOGOFF => Ok(SessionChangeParam::SessionLogoff(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_LOCK => Ok(SessionChangeParam::SessionLock(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_UNLOCK => Ok(SessionChangeParam::SessionUnlock(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_REMOTE_CONTROL => Ok(SessionChangeParam::SessionRemoteControl(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_CREATE => Ok(SessionChangeParam::SessionCreate(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            winuser::WTS_SESSION_TERMINATE => Ok(SessionChangeParam::SessionTerminate(
+                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+            )),
+            _ => Err(ParseRawError(event_type)),
+        }
+    }
+}
+
 /// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
 pub enum ServiceControl {
-    Continue = winsvc::SERVICE_CONTROL_CONTINUE,
-    Interrogate = winsvc::SERVICE_CONTROL_INTERROGATE,
-    NetBindAdd = winsvc::SERVICE_CONTROL_NETBINDADD,
-    NetBindDisable = winsvc::SERVICE_CONTROL_NETBINDDISABLE,
-    NetBindEnable = winsvc::SERVICE_CONTROL_NETBINDENABLE,
-    NetBindRemove = winsvc::SERVICE_CONTROL_NETBINDREMOVE,
-    ParamChange = winsvc::SERVICE_CONTROL_PARAMCHANGE,
-    Pause = winsvc::SERVICE_CONTROL_PAUSE,
-    Preshutdown = winsvc::SERVICE_CONTROL_PRESHUTDOWN,
-    Shutdown = winsvc::SERVICE_CONTROL_SHUTDOWN,
-    Stop = winsvc::SERVICE_CONTROL_STOP,
+    Continue,
+    Interrogate,
+    NetBindAdd,
+    NetBindDisable,
+    NetBindEnable,
+    NetBindRemove,
+    ParamChange,
+    Pause,
+    Preshutdown,
+    Shutdown,
+    Stop,
+    DeviceEvent(DeviceEventParam),
+    HardwareProfileChange(HardwareProfileChangeParam),
+    PowerEvent(PowerEventParam),
+    SessionChange(SessionChangeParam),
+    TimeChange,
+    TriggerEvent,
 }
 
 impl ServiceControl {
-    pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
+    pub fn from_raw(raw: u32, event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
         match raw {
-            x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
-            x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
-            x if x == ServiceControl::NetBindAdd.to_raw() => Ok(ServiceControl::NetBindAdd),
-            x if x == ServiceControl::NetBindDisable.to_raw() => Ok(ServiceControl::NetBindDisable),
-            x if x == ServiceControl::NetBindEnable.to_raw() => Ok(ServiceControl::NetBindEnable),
-            x if x == ServiceControl::NetBindRemove.to_raw() => Ok(ServiceControl::NetBindRemove),
-            x if x == ServiceControl::ParamChange.to_raw() => Ok(ServiceControl::ParamChange),
-            x if x == ServiceControl::Pause.to_raw() => Ok(ServiceControl::Pause),
-            x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
-            x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
-            x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
+            winsvc::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
+            winsvc::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
+            winsvc::SERVICE_CONTROL_NETBINDADD => Ok(ServiceControl::NetBindAdd),
+            winsvc::SERVICE_CONTROL_NETBINDDISABLE => Ok(ServiceControl::NetBindDisable),
+            winsvc::SERVICE_CONTROL_NETBINDENABLE => Ok(ServiceControl::NetBindEnable),
+            winsvc::SERVICE_CONTROL_NETBINDREMOVE => Ok(ServiceControl::NetBindRemove),
+            winsvc::SERVICE_CONTROL_PARAMCHANGE => Ok(ServiceControl::ParamChange),
+            winsvc::SERVICE_CONTROL_PAUSE => Ok(ServiceControl::Pause),
+            winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
+            winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
+            winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
+            winsvc::SERVICE_CONTROL_DEVICEEVENT => DeviceEventParam::from_event(
+                event_type, event_data).map(ServiceControl::DeviceEvent),
+            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => HardwareProfileChangeParam::from_event(
+                event_type).map(ServiceControl::HardwareProfileChange),
+            winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
+                event_type, event_data).map(ServiceControl::PowerEvent),
+            winsvc::SERVICE_CONTROL_SESSIONCHANGE => SessionChangeParam::from_event(
+                event_type, event_data).map(ServiceControl::SessionChange),
+            winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
+            winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
             _ => Err(ParseRawError(raw)),
         }
     }
 
     pub fn to_raw(&self) -> u32 {
-        *self as u32
+        match self {
+            ServiceControl::Continue => winsvc::SERVICE_CONTROL_CONTINUE,
+            ServiceControl::Interrogate => winsvc::SERVICE_CONTROL_INTERROGATE,
+            ServiceControl::NetBindAdd => winsvc::SERVICE_CONTROL_NETBINDADD,
+            ServiceControl::NetBindDisable => winsvc::SERVICE_CONTROL_NETBINDDISABLE,
+            ServiceControl::NetBindEnable => winsvc::SERVICE_CONTROL_NETBINDENABLE,
+            ServiceControl::NetBindRemove => winsvc::SERVICE_CONTROL_NETBINDREMOVE,
+            ServiceControl::ParamChange => winsvc::SERVICE_CONTROL_PARAMCHANGE,
+            ServiceControl::Pause => winsvc::SERVICE_CONTROL_PAUSE,
+            ServiceControl::Preshutdown => winsvc::SERVICE_CONTROL_PRESHUTDOWN,
+            ServiceControl::Shutdown => winsvc::SERVICE_CONTROL_SHUTDOWN,
+            ServiceControl::Stop => winsvc::SERVICE_CONTROL_STOP,
+            ServiceControl::DeviceEvent(_) => winsvc::SERVICE_CONTROL_DEVICEEVENT,
+            ServiceControl::HardwareProfileChange(_) => winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE,
+            ServiceControl::PowerEvent(_) => winsvc::SERVICE_CONTROL_POWEREVENT,
+            ServiceControl::SessionChange(_) => winsvc::SERVICE_CONTROL_SESSIONCHANGE,
+            ServiceControl::TimeChange => winsvc::SERVICE_CONTROL_TIMECHANGE,
+            ServiceControl::TriggerEvent => winsvc::SERVICE_CONTROL_TRIGGEREVENT,
+        }
     }
 }
 
@@ -576,6 +758,27 @@ bitflags::bitflags! {
 
         /// The service can be stopped.
         const STOP = winsvc::SERVICE_ACCEPT_STOP;
+
+        /// The service is notified when the computer's hardware profile has changed.
+        /// This enables the system to send SERVICE_CONTROL_HARDWAREPROFILECHANGE
+        /// notifications to the service.
+        const HARDWAREPROFILECHANGE = winsvc::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
+
+        /// The service is notified when the computer's power status has changed.
+        /// This enables the system to send SERVICE_CONTROL_POWEREVENT notifications to the service.
+        const POWEREVENT = winsvc::SERVICE_ACCEPT_POWEREVENT;
+
+        /// The service is notified when the computer's session status has changed.
+        /// This enables the system to send SERVICE_CONTROL_SESSIONCHANGE notifications to the service.
+        const SESSIONCHANGE = winsvc::SERVICE_ACCEPT_SESSIONCHANGE;
+
+        /// The service is notified when the system time has changed.
+        /// This enables the system to send SERVICE_CONTROL_TIMECHANGE notifications to the service.
+        const TIMECHANGE = winsvc::SERVICE_ACCEPT_TIMECHANGE;
+
+        /// The service is notified when an event for which the service has registered occurs.
+        /// This enables the system to send SERVICE_CONTROL_TRIGGEREVENT notifications to the service.
+        const TRIGGEREVENT = winsvc::SERVICE_ACCEPT_TRIGGEREVENT;
     }
 }
 

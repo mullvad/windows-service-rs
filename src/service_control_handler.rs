@@ -125,8 +125,8 @@ where
 #[allow(dead_code)]
 extern "system" fn service_control_handler<F>(
     control: u32,
-    _event_type: u32,
-    _event_data: *mut c_void,
+    event_type: u32,
+    event_data: *mut c_void,
     context: *mut c_void,
 ) -> u32
 where
@@ -135,7 +135,7 @@ where
     // Important: cast context to &mut F without taking ownership.
     let event_handler: &mut F = unsafe { &mut *(context as *mut F) };
 
-    match ServiceControl::from_raw(control) {
+    match ServiceControl::from_raw(control, event_type, event_data) {
         Ok(service_control) => {
             let return_code = event_handler(service_control).to_raw();
 
