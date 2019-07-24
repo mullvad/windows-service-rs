@@ -816,12 +816,10 @@ impl Service {
     pub fn update_failure_actions(&self, update: ServiceFailureActions) -> crate::Result<()> {
         let mut raw_failure_actions = unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONSW>() };
 
-        let mut reboot_msg = to_wide(update.reboot_msg)
-            .map_err(Error::InvalidServiceActionFailuresRebootMessage)?
-            .map(|s| s.as_slice_with_nul().to_vec());
-        let mut command = to_wide(update.command)
-            .map_err(Error::InvalidServiceActionFailuresCommand)?
-            .map(|s| s.as_slice_with_nul().to_vec());
+        let mut reboot_msg = to_wide_slice(update.reboot_msg)
+            .map_err(Error::InvalidServiceActionFailuresRebootMessage)?;
+        let mut command =
+            to_wide_slice(update.command).map_err(Error::InvalidServiceActionFailuresCommand)?;
 
         let mut sc_actions: Option<Vec<winsvc::SC_ACTION>> = update
             .actions
@@ -901,9 +899,13 @@ impl Service {
     }
 }
 
-fn to_wide<T: AsRef<OsStr>>(s: Option<T>) -> ::std::result::Result<Option<WideCString>, NulError> {
+fn to_wide_slice<T: AsRef<OsStr>>(
+    s: Option<T>,
+) -> ::std::result::Result<Option<Vec<u16>>, NulError> {
     if let Some(s) = s {
-        Ok(Some(WideCString::from_str(s)?))
+        Ok(Some(
+            WideCString::from_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
+        ))
     } else {
         Ok(None)
     }
