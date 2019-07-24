@@ -762,23 +762,23 @@ bitflags::bitflags! {
         /// The service is notified when the computer's hardware profile has changed.
         /// This enables the system to send SERVICE_CONTROL_HARDWAREPROFILECHANGE
         /// notifications to the service.
-        const HARDWAREPROFILECHANGE = winsvc::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
+        const HARDWARE_PROFILE_CHANGE = winsvc::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
 
         /// The service is notified when the computer's power status has changed.
         /// This enables the system to send SERVICE_CONTROL_POWEREVENT notifications to the service.
-        const POWEREVENT = winsvc::SERVICE_ACCEPT_POWEREVENT;
+        const POWER_EVENT = winsvc::SERVICE_ACCEPT_POWEREVENT;
 
         /// The service is notified when the computer's session status has changed.
         /// This enables the system to send SERVICE_CONTROL_SESSIONCHANGE notifications to the service.
-        const SESSIONCHANGE = winsvc::SERVICE_ACCEPT_SESSIONCHANGE;
+        const SESSION_CHANGE = winsvc::SERVICE_ACCEPT_SESSIONCHANGE;
 
         /// The service is notified when the system time has changed.
         /// This enables the system to send SERVICE_CONTROL_TIMECHANGE notifications to the service.
-        const TIMECHANGE = winsvc::SERVICE_ACCEPT_TIMECHANGE;
+        const TIME_CHANGE = winsvc::SERVICE_ACCEPT_TIMECHANGE;
 
         /// The service is notified when an event for which the service has registered occurs.
         /// This enables the system to send SERVICE_CONTROL_TRIGGEREVENT notifications to the service.
-        const TRIGGEREVENT = winsvc::SERVICE_ACCEPT_TRIGGEREVENT;
+        const TRIGGER_EVENT = winsvc::SERVICE_ACCEPT_TRIGGEREVENT;
     }
 }
 
