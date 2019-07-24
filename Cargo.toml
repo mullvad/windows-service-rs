@@ -13,5 +13,5 @@ edition = "2018"
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.0.1"
 err-derive = "0.1.5"
-winapi = { git = "https://github.com/pronebird/winapi-rs.git", branch = "add-failure-actions-ffi", features = ["std", "winsvc", "winbase", "winerror"] }
+winapi = { git = "https://github.com/mullvad/winapi-rs.git", branch = "add-failure-actions-ffi", features = ["std", "winsvc", "winbase", "winerror"] }
 widestring = "0.3.0"
