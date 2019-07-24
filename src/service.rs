@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
@@ -6,10 +7,11 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{NulError, WideCStr, WideCString};
+use winapi::shared::guiddef::{IsEqualGUID, GUID};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
-use winapi::um::{winnt, winsvc};
+use winapi::um::{dbt, winnt, winsvc, winuser};
 
 use crate::sc_handle::ScHandle;
 use crate::{double_nul_terminated, Error};
@@ -91,7 +93,7 @@ impl ServiceStartType {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -119,7 +121,7 @@ impl ServiceErrorControl {
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -183,7 +185,7 @@ impl ServiceActionType {
             x if x == ServiceActionType::Reboot.to_raw() => Ok(ServiceActionType::Reboot),
             x if x == ServiceActionType::Restart.to_raw() => Ok(ServiceActionType::Restart),
             x if x == ServiceActionType::RunCommand.to_raw() => Ok(ServiceActionType::RunCommand),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -426,43 +428,524 @@ impl ServiceConfig {
     }
 }
 
-/// Enum describing the service control operations.
+/// Enum describing the event type of HardwareProfileChange
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
-pub enum ServiceControl {
-    Continue = winsvc::SERVICE_CONTROL_CONTINUE,
-    Interrogate = winsvc::SERVICE_CONTROL_INTERROGATE,
-    NetBindAdd = winsvc::SERVICE_CONTROL_NETBINDADD,
-    NetBindDisable = winsvc::SERVICE_CONTROL_NETBINDDISABLE,
-    NetBindEnable = winsvc::SERVICE_CONTROL_NETBINDENABLE,
-    NetBindRemove = winsvc::SERVICE_CONTROL_NETBINDREMOVE,
-    ParamChange = winsvc::SERVICE_CONTROL_PARAMCHANGE,
-    Pause = winsvc::SERVICE_CONTROL_PAUSE,
-    Preshutdown = winsvc::SERVICE_CONTROL_PRESHUTDOWN,
-    Shutdown = winsvc::SERVICE_CONTROL_SHUTDOWN,
-    Stop = winsvc::SERVICE_CONTROL_STOP,
+pub enum HardwareProfileChangeParam {
+    ConfigChanged = dbt::DBT_CONFIGCHANGED as u32,
+    QueryChangeConfig = dbt::DBT_QUERYCHANGECONFIG as u32,
+    ConfigChangeCanceled = dbt::DBT_CONFIGCHANGECANCELED as u32,
 }
 
-impl ServiceControl {
+impl HardwareProfileChangeParam {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
     pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
         match raw {
-            x if x == ServiceControl::Continue.to_raw() => Ok(ServiceControl::Continue),
-            x if x == ServiceControl::Interrogate.to_raw() => Ok(ServiceControl::Interrogate),
-            x if x == ServiceControl::NetBindAdd.to_raw() => Ok(ServiceControl::NetBindAdd),
-            x if x == ServiceControl::NetBindDisable.to_raw() => Ok(ServiceControl::NetBindDisable),
-            x if x == ServiceControl::NetBindEnable.to_raw() => Ok(ServiceControl::NetBindEnable),
-            x if x == ServiceControl::NetBindRemove.to_raw() => Ok(ServiceControl::NetBindRemove),
-            x if x == ServiceControl::ParamChange.to_raw() => Ok(ServiceControl::ParamChange),
-            x if x == ServiceControl::Pause.to_raw() => Ok(ServiceControl::Pause),
-            x if x == ServiceControl::Preshutdown.to_raw() => Ok(ServiceControl::Preshutdown),
-            x if x == ServiceControl::Shutdown.to_raw() => Ok(ServiceControl::Shutdown),
-            x if x == ServiceControl::Stop.to_raw() => Ok(ServiceControl::Stop),
-            _ => Err(ParseRawError(raw)),
+            x if x == HardwareProfileChangeParam::ConfigChanged.to_raw() => {
+                Ok(HardwareProfileChangeParam::ConfigChanged)
+            }
+            x if x == HardwareProfileChangeParam::QueryChangeConfig.to_raw() => {
+                Ok(HardwareProfileChangeParam::QueryChangeConfig)
+            }
+            x if x == HardwareProfileChangeParam::ConfigChangeCanceled.to_raw() => {
+                Ok(HardwareProfileChangeParam::ConfigChangeCanceled)
+            }
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current power source as
+/// the Data member of GUID_ACDC_POWER_SOURCE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum PowerSource {
+    Ac = winnt::PoAc,
+    Dc = winnt::PoDc,
+    Hot = winnt::PoHot,
+}
+
+impl PowerSource {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<PowerSource, ParseRawError> {
+        match raw {
+            x if x == PowerSource::Ac.to_raw() => Ok(PowerSource::Ac),
+            x if x == PowerSource::Dc.to_raw() => Ok(PowerSource::Dc),
+            x if x == PowerSource::Hot.to_raw() => Ok(PowerSource::Hot),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current monitor's display state as
+/// the Data member of GUID_CONSOLE_DISPLAY_STATE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum DisplayState {
+    Off = winnt::PowerMonitorOff,
+    On = winnt::PowerMonitorOn,
+    Dimmed = winnt::PowerMonitorDim,
+}
+
+impl DisplayState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<DisplayState, ParseRawError> {
+        match raw {
+            x if x == DisplayState::Off.to_raw() => Ok(DisplayState::Off),
+            x if x == DisplayState::On.to_raw() => Ok(DisplayState::On),
+            x if x == DisplayState::Dimmed.to_raw() => Ok(DisplayState::Dimmed),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the combined status of user presence
+/// across all local and remote sessions on the system as
+/// the Data member of GUID_GLOBAL_USER_PRESENCE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum UserStatus {
+    Present = winnt::PowerUserPresent,
+    Inactive = winnt::PowerUserInactive,
+}
+
+impl UserStatus {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<UserStatus, ParseRawError> {
+        match raw {
+            x if x == UserStatus::Present.to_raw() => Ok(UserStatus::Present),
+            x if x == UserStatus::Inactive.to_raw() => Ok(UserStatus::Inactive),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current monitor state as
+/// the Data member of GUID_MONITOR_POWER_ON notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum MonitorState {
+    Off = 0,
+    On = 1,
+}
+
+impl MonitorState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<MonitorState, ParseRawError> {
+        match raw {
+            x if x == MonitorState::Off.to_raw() => Ok(MonitorState::Off),
+            x if x == MonitorState::On.to_raw() => Ok(MonitorState::On),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the battery saver state as
+/// the Data member of GUID_POWER_SAVING_STATUS notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum BatterySaverState {
+    Off = 0,
+    On = 1,
+}
+
+impl BatterySaverState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<BatterySaverState, ParseRawError> {
+        match raw {
+            x if x == BatterySaverState::Off.to_raw() => Ok(BatterySaverState::Off),
+            x if x == BatterySaverState::On.to_raw() => Ok(BatterySaverState::On),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Enum indicates the power scheme personality as
+/// the Data member of GUID_POWERSCHEME_PERSONALITY notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerSchemePersonality {
+    HighPerformance,
+    PowerSaver,
+    Automatic,
+}
+
+impl PowerSchemePersonality {
+    pub fn from_guid(guid: &GUID) -> Result<PowerSchemePersonality, ParseRawError> {
+        match guid {
+            x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::HighPerformance)
+            }
+            x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::PowerSaver)
+            }
+            x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::Automatic)
+            }
+            x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
+        }
+    }
+}
+
+/// Enum indicates the current away mode state as
+/// the Data member of GUID_SYSTEM_AWAYMODE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum AwayModeState {
+    Exiting = 0,
+    Entering = 1,
+}
+
+impl AwayModeState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<AwayModeState, ParseRawError> {
+        match raw {
+            x if x == AwayModeState::Exiting.to_raw() => Ok(AwayModeState::Exiting),
+            x if x == AwayModeState::Entering.to_raw() => Ok(AwayModeState::Entering),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
+/// Struct converted from winuser::POWERBROADCAST_SETTING
+///
+/// Please refer to MSDN for more info about the data members:
+/// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerBroadcastSetting {
+    AcdcPowerSource(PowerSource),
+    BatteryPercentageRemaining(u32),
+    ConsoleDisplayState(DisplayState),
+    GlobalUserPresence(UserStatus),
+    IdleBackgroundTask,
+    MonitorPowerOn(MonitorState),
+    PowerSavingStatus(BatterySaverState),
+    PowerSchemePersonality(PowerSchemePersonality),
+    SystemAwayMode(AwayModeState),
+}
+
+impl PowerBroadcastSetting {
+    /// Extract PowerBroadcastSetting from `raw`
+    ///
+    /// # Safety
+    ///
+    /// The `raw` must be a valid winuser::POWERBROADCAST_SETTING pointer.
+    /// Otherwise, it is undefined behavior.
+    pub unsafe fn from_raw(raw: *mut c_void) -> Result<PowerBroadcastSetting, ParseRawError> {
+        let setting = &*(raw as *const winuser::POWERBROADCAST_SETTING);
+        let data = &setting.Data as *const u8;
+
+        match &setting.PowerSetting {
+            x if IsEqualGUID(x, &winnt::GUID_ACDC_POWER_SOURCE) => {
+                let power_source = *(data as *const u32);
+                Ok(PowerBroadcastSetting::AcdcPowerSource(
+                    PowerSource::from_raw(power_source)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
+                let percentage = *(data as *const u32);
+                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
+                    percentage,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
+                let display_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::ConsoleDisplayState(
+                    DisplayState::from_raw(display_state)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
+                let user_status = *(data as *const u32);
+                Ok(PowerBroadcastSetting::GlobalUserPresence(
+                    UserStatus::from_raw(user_status)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
+                Ok(PowerBroadcastSetting::IdleBackgroundTask)
+            }
+            x if IsEqualGUID(x, &winnt::GUID_MONITOR_POWER_ON) => {
+                let monitor_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::MonitorPowerOn(
+                    MonitorState::from_raw(monitor_state)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_POWER_SAVING_STATUS) => {
+                let battery_saver_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::PowerSavingStatus(
+                    BatterySaverState::from_raw(battery_saver_state)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
+                let guid = *(data as *const GUID);
+                Ok(PowerBroadcastSetting::PowerSchemePersonality(
+                    PowerSchemePersonality::from_guid(&guid)?,
+                ))
+            }
+            x if IsEqualGUID(x, &winnt::GUID_SYSTEM_AWAYMODE) => {
+                let away_mode_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::SystemAwayMode(
+                    AwayModeState::from_raw(away_mode_state)?,
+                ))
+            }
+            x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
+        }
+    }
+}
+
+/// Enum describing the PowerEvent event
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerEventParam {
+    PowerStatusChange,
+    ResumeAutomatic,
+    ResumeSuspend,
+    Suspend,
+    PowerSettingChange(PowerBroadcastSetting),
+    BatteryLow,
+    OemEvent,
+    QuerySuspend,
+    QuerySuspendFailed,
+    ResumeCritical,
+}
+
+impl PowerEventParam {
+    /// Extract PowerEventParam from `event_type` and `event_data`
+    ///
+    /// # Safety
+    ///
+    /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
+    /// Please refer to MSDN for more info about the requirements:
+    /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
+    pub unsafe fn from_event(
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
+        match event_type as usize {
+            winuser::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
+            winuser::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
+            winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
+            winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
+            winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
+                PowerBroadcastSetting::from_raw(event_data)?,
+            )),
+            winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
+            winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
+            winuser::PBT_APMQUERYSUSPEND => Ok(PowerEventParam::QuerySuspend),
+            winuser::PBT_APMQUERYSUSPENDFAILED => Ok(PowerEventParam::QuerySuspendFailed),
+            winuser::PBT_APMRESUMECRITICAL => Ok(PowerEventParam::ResumeCritical),
+            _ => Err(ParseRawError::InvalidInteger(event_type)),
+        }
+    }
+}
+
+/// Enum describing the reason of a SessionChange event
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum SessionChangeReason {
+    ConsoleConnect = winuser::WTS_CONSOLE_CONNECT as u32,
+    ConsoleDisconnect = winuser::WTS_CONSOLE_DISCONNECT as u32,
+    RemoteConnect = winuser::WTS_REMOTE_CONNECT as u32,
+    RemoteDisconnect = winuser::WTS_REMOTE_DISCONNECT as u32,
+    SessionLogon = winuser::WTS_SESSION_LOGON as u32,
+    SessionLogoff = winuser::WTS_SESSION_LOGOFF as u32,
+    SessionLock = winuser::WTS_SESSION_LOCK as u32,
+    SessionUnlock = winuser::WTS_SESSION_UNLOCK as u32,
+    SessionRemoteControl = winuser::WTS_SESSION_REMOTE_CONTROL as u32,
+    SessionCreate = winuser::WTS_SESSION_CREATE as u32,
+    SessionTerminate = winuser::WTS_SESSION_TERMINATE as u32,
+}
+
+impl SessionChangeReason {
+    pub fn from_raw(raw: u32) -> Result<SessionChangeReason, ParseRawError> {
+        match raw {
+            x if x == SessionChangeReason::ConsoleConnect.to_raw() => {
+                Ok(SessionChangeReason::ConsoleConnect)
+            }
+            x if x == SessionChangeReason::ConsoleDisconnect.to_raw() => {
+                Ok(SessionChangeReason::ConsoleDisconnect)
+            }
+            x if x == SessionChangeReason::RemoteConnect.to_raw() => {
+                Ok(SessionChangeReason::RemoteConnect)
+            }
+            x if x == SessionChangeReason::RemoteDisconnect.to_raw() => {
+                Ok(SessionChangeReason::RemoteDisconnect)
+            }
+            x if x == SessionChangeReason::SessionLogon.to_raw() => {
+                Ok(SessionChangeReason::SessionLogon)
+            }
+            x if x == SessionChangeReason::SessionLogoff.to_raw() => {
+                Ok(SessionChangeReason::SessionLogoff)
+            }
+            x if x == SessionChangeReason::SessionLock.to_raw() => {
+                Ok(SessionChangeReason::SessionLock)
+            }
+            x if x == SessionChangeReason::SessionUnlock.to_raw() => {
+                Ok(SessionChangeReason::SessionUnlock)
+            }
+            x if x == SessionChangeReason::SessionRemoteControl.to_raw() => {
+                Ok(SessionChangeReason::SessionRemoteControl)
+            }
+            x if x == SessionChangeReason::SessionCreate.to_raw() => {
+                Ok(SessionChangeReason::SessionCreate)
+            }
+            x if x == SessionChangeReason::SessionTerminate.to_raw() => {
+                Ok(SessionChangeReason::SessionTerminate)
+            }
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
     pub fn to_raw(&self) -> u32 {
         *self as u32
+    }
+}
+
+/// Struct converted from winuser::WTSSESSION_NOTIFICATION
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SessionNotification {
+    pub size: u32,
+    pub session_id: u32,
+}
+
+impl SessionNotification {
+    pub fn from_raw(raw: winuser::WTSSESSION_NOTIFICATION) -> Self {
+        SessionNotification {
+            size: raw.cbSize,
+            session_id: raw.dwSessionId,
+        }
+    }
+}
+
+/// Struct describing the SessionChange event
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SessionChangeParam {
+    pub reason: SessionChangeReason,
+    pub notification: SessionNotification,
+}
+
+impl SessionChangeParam {
+    /// Extract SessionChangeParam from `event_data`
+    ///
+    /// # Safety
+    ///
+    /// The `event_data` must be a valid winuser::WTSSESSION_NOTIFICATION pointer.
+    /// Otherwise, it is undefined behavior.
+    pub unsafe fn from_event(
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
+        let notification = *(event_data as *const winuser::WTSSESSION_NOTIFICATION);
+
+        Ok(SessionChangeParam {
+            reason: SessionChangeReason::from_raw(event_type)?,
+            notification: SessionNotification::from_raw(notification),
+        })
+    }
+}
+
+/// Enum describing the service control operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ServiceControl {
+    Continue,
+    Interrogate,
+    NetBindAdd,
+    NetBindDisable,
+    NetBindEnable,
+    NetBindRemove,
+    ParamChange,
+    Pause,
+    Preshutdown,
+    Shutdown,
+    Stop,
+    HardwareProfileChange(HardwareProfileChangeParam),
+    PowerEvent(PowerEventParam),
+    SessionChange(SessionChangeParam),
+    TimeChange,
+    TriggerEvent,
+}
+
+impl ServiceControl {
+    /// Convert to ServiceControl from parameters received by `service_control_handler`
+    ///
+    /// # Safety
+    ///
+    /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
+    /// Please refer to MSDN for more info about the requirements:
+    /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
+    pub unsafe fn from_raw(
+        raw: u32,
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
+        match raw {
+            winsvc::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
+            winsvc::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
+            winsvc::SERVICE_CONTROL_NETBINDADD => Ok(ServiceControl::NetBindAdd),
+            winsvc::SERVICE_CONTROL_NETBINDDISABLE => Ok(ServiceControl::NetBindDisable),
+            winsvc::SERVICE_CONTROL_NETBINDENABLE => Ok(ServiceControl::NetBindEnable),
+            winsvc::SERVICE_CONTROL_NETBINDREMOVE => Ok(ServiceControl::NetBindRemove),
+            winsvc::SERVICE_CONTROL_PARAMCHANGE => Ok(ServiceControl::ParamChange),
+            winsvc::SERVICE_CONTROL_PAUSE => Ok(ServiceControl::Pause),
+            winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
+            winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
+            winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
+            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => {
+                HardwareProfileChangeParam::from_raw(event_type)
+                    .map(ServiceControl::HardwareProfileChange)
+            }
+            winsvc::SERVICE_CONTROL_POWEREVENT => {
+                PowerEventParam::from_event(event_type, event_data).map(ServiceControl::PowerEvent)
+            }
+            winsvc::SERVICE_CONTROL_SESSIONCHANGE => {
+                SessionChangeParam::from_event(event_type, event_data)
+                    .map(ServiceControl::SessionChange)
+            }
+            winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
+            winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+
+    pub fn raw_service_control_type(&self) -> u32 {
+        match self {
+            ServiceControl::Continue => winsvc::SERVICE_CONTROL_CONTINUE,
+            ServiceControl::Interrogate => winsvc::SERVICE_CONTROL_INTERROGATE,
+            ServiceControl::NetBindAdd => winsvc::SERVICE_CONTROL_NETBINDADD,
+            ServiceControl::NetBindDisable => winsvc::SERVICE_CONTROL_NETBINDDISABLE,
+            ServiceControl::NetBindEnable => winsvc::SERVICE_CONTROL_NETBINDENABLE,
+            ServiceControl::NetBindRemove => winsvc::SERVICE_CONTROL_NETBINDREMOVE,
+            ServiceControl::ParamChange => winsvc::SERVICE_CONTROL_PARAMCHANGE,
+            ServiceControl::Pause => winsvc::SERVICE_CONTROL_PAUSE,
+            ServiceControl::Preshutdown => winsvc::SERVICE_CONTROL_PRESHUTDOWN,
+            ServiceControl::Shutdown => winsvc::SERVICE_CONTROL_SHUTDOWN,
+            ServiceControl::Stop => winsvc::SERVICE_CONTROL_STOP,
+            ServiceControl::HardwareProfileChange(_) => {
+                winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE
+            }
+            ServiceControl::PowerEvent(_) => winsvc::SERVICE_CONTROL_POWEREVENT,
+            ServiceControl::SessionChange(_) => winsvc::SERVICE_CONTROL_SESSIONCHANGE,
+            ServiceControl::TimeChange => winsvc::SERVICE_CONTROL_TIMECHANGE,
+            ServiceControl::TriggerEvent => winsvc::SERVICE_CONTROL_TRIGGEREVENT,
+        }
     }
 }
 
@@ -489,7 +972,7 @@ impl ServiceState {
             x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
             x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
             x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
@@ -576,6 +1059,27 @@ bitflags::bitflags! {
 
         /// The service can be stopped.
         const STOP = winsvc::SERVICE_ACCEPT_STOP;
+
+        /// The service is notified when the computer's hardware profile has changed.
+        /// This enables the system to send SERVICE_CONTROL_HARDWAREPROFILECHANGE
+        /// notifications to the service.
+        const HARDWARE_PROFILE_CHANGE = winsvc::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
+
+        /// The service is notified when the computer's power status has changed.
+        /// This enables the system to send SERVICE_CONTROL_POWEREVENT notifications to the service.
+        const POWER_EVENT = winsvc::SERVICE_ACCEPT_POWEREVENT;
+
+        /// The service is notified when the computer's session status has changed.
+        /// This enables the system to send SERVICE_CONTROL_SESSIONCHANGE notifications to the service.
+        const SESSION_CHANGE = winsvc::SERVICE_ACCEPT_SESSIONCHANGE;
+
+        /// The service is notified when the system time has changed.
+        /// This enables the system to send SERVICE_CONTROL_TIMECHANGE notifications to the service.
+        const TIME_CHANGE = winsvc::SERVICE_ACCEPT_TIMECHANGE;
+
+        /// The service is notified when an event for which the service has registered occurs.
+        /// This enables the system to send SERVICE_CONTROL_TRIGGEREVENT notifications to the service.
+        const TRIGGER_EVENT = winsvc::SERVICE_ACCEPT_TRIGGEREVENT;
     }
 }
 
@@ -898,7 +1402,7 @@ impl Service {
         let success = unsafe {
             winsvc::ControlService(
                 self.service_handle.raw_handle(),
-                command.to_raw(),
+                command.raw_service_control_type(),
                 &mut raw_status,
             )
         };
@@ -958,10 +1462,31 @@ fn to_wide_slice<T: AsRef<OsStr>>(
     }
 }
 
-
 #[derive(err_derive::Error, Debug)]
-#[error(display = "Invalid integer value for the target type: {}", _0)]
-pub struct ParseRawError(u32);
+pub enum ParseRawError {
+    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    InvalidInteger(u32),
+
+    #[error(display = "Invalid GUID value for the target type: {}", _0)]
+    InvalidGuid(String),
+}
+
+fn string_from_guid(guid: &GUID) -> String {
+    format!(
+        "{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
+        guid.Data1,
+        guid.Data2,
+        guid.Data3,
+        guid.Data4[0],
+        guid.Data4[1],
+        guid.Data4[2],
+        guid.Data4[3],
+        guid.Data4[4],
+        guid.Data4[5],
+        guid.Data4[6],
+        guid.Data4[7]
+    )
+}
 
 #[cfg(test)]
 mod tests {
