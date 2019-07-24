@@ -771,74 +771,42 @@ impl Service {
 
         raw_failure_actions_flag.fFailureActionsOnNonCrashFailures = if enabled { 1 } else { 0 };
 
-        let success = unsafe {
-            winsvc::ChangeServiceConfig2W(
-                self.service_handle.raw_handle(),
+        unsafe {
+            self.change_config2(
                 winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG,
-                &mut raw_failure_actions_flag as *mut _ as *mut _,
+                &mut raw_failure_actions_flag,
             )
-        };
-
-        if success == 0 {
-            Err(Error::Winapi(io::Error::last_os_error()))
-        } else {
-            Ok(())
+            .map_err(Error::Winapi)
         }
     }
 
     pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
-        // As per docs, the maximum size of data buffer used by QueryServiceConfig2W is 8K
         let mut data = [0u8; 8096];
-        let mut bytes_written: u32 = 0;
 
-        let success = unsafe {
-            winsvc::QueryServiceConfig2W(
-                self.service_handle.raw_handle(),
-                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG,
-                data.as_mut_ptr() as _,
-                data.len() as u32,
-                &mut bytes_written,
-            )
+        let raw_failure_actions_flag: winsvc::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
+            self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
+                .map_err(Error::Winapi)?
         };
 
-        if success == 0 {
-            Err(Error::Winapi(io::Error::last_os_error()))
+        let result = if raw_failure_actions_flag.fFailureActionsOnNonCrashFailures == 0 {
+            false
         } else {
-            unsafe {
-                let raw_failure_actions =
-                    data.as_ptr() as *const winsvc::SERVICE_FAILURE_ACTIONS_FLAG;
-                if (*raw_failure_actions).fFailureActionsOnNonCrashFailures == 0 {
-                    Ok(false)
-                } else {
-                    Ok(true)
-                }
-            }
-        }
+            true
+        };
+
+        Ok(result)
     }
 
     /// Get failure actions from the system.
     pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
-        // As per docs, the maximum size of data buffer used by QueryServiceConfig2W is 8K
-        let mut data = [0u8; 8096];
-        let mut bytes_written: u32 = 0;
+        unsafe {
+            let mut data = [0u8; 8096];
 
-        let success = unsafe {
-            winsvc::QueryServiceConfig2W(
-                self.service_handle.raw_handle(),
-                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS,
-                data.as_mut_ptr() as _,
-                data.len() as u32,
-                &mut bytes_written,
-            )
-        };
+            let raw_failure_actions: winsvc::SERVICE_FAILURE_ACTIONSW = self
+                .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
+                .map_err(Error::Winapi)?;
 
-        if success == 0 {
-            Err(Error::Winapi(io::Error::last_os_error()))
-        } else {
-            unsafe {
-                let raw_failure_actions = data.as_ptr() as *const winsvc::SERVICE_FAILURE_ACTIONSW;
-                ServiceFailureActions::from_raw(*raw_failure_actions)
-            }
+            ServiceFailureActions::from_raw(raw_failure_actions)
         }
     }
 
@@ -870,18 +838,12 @@ impl Service {
             .as_mut()
             .map_or(ptr::null_mut(), |actions| actions.as_mut_ptr());
 
-        let success = unsafe {
-            winsvc::ChangeServiceConfig2W(
-                self.service_handle.raw_handle(),
+        unsafe {
+            self.change_config2(
                 winsvc::SERVICE_CONFIG_FAILURE_ACTIONS,
-                &mut raw_failure_actions as *mut _ as *mut _,
+                &mut raw_failure_actions,
             )
-        };
-
-        if success == 0 {
-            Err(Error::Winapi(io::Error::last_os_error()))
-        } else {
-            Ok(())
+            .map_err(Error::Winapi)
         }
     }
 
@@ -900,6 +862,41 @@ impl Service {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
+        }
+    }
+
+    /// Private helper to query the optional configuration parameters of windows services.
+    /// As per docs, the maximum size of data buffer used by QueryServiceConfig2W is 8K
+    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; 8096]) -> io::Result<T> {
+        let mut bytes_written: u32 = 0;
+
+        let success = winsvc::QueryServiceConfig2W(
+            self.service_handle.raw_handle(),
+            kind,
+            data.as_mut_ptr() as _,
+            data.len() as u32,
+            &mut bytes_written,
+        );
+
+        if success == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(*(data.as_ptr() as *const _))
+        }
+    }
+
+    /// Private helper to update the optional configuration parameters of windows services.
+    unsafe fn change_config2<T>(&self, kind: DWORD, data: &mut T) -> io::Result<()> {
+        let success = winsvc::ChangeServiceConfig2W(
+            self.service_handle.raw_handle(),
+            kind,
+            data as *mut _ as *mut _,
+        );
+
+        if success == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
         }
     }
 }
