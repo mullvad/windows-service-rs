@@ -171,6 +171,9 @@
 //! [`ServiceStatus::checkpoint`]: service::ServiceStatus::checkpoint
 //! [`StartPending`]: service::ServiceState::StartPending
 //! [`Running`]: service::ServiceState::Running
+//! [`ServiceActionType`]: service::ServiceActionType
+//! [`ServiceErrorControl`]: service::ServiceErrorControl
+//! [`ServiceState`]: service::ServiceState
 
 #![cfg(windows)]
 

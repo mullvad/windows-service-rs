@@ -67,16 +67,17 @@ fn main() -> windows_service::Result<()> {
     };
     service.update_failure_actions(failure_actions)?;
 
-    println!("Got failure actions:");
+    println!("Query failure actions");
     let updated_failure_actions = service.get_failure_actions()?;
     println!("{:#?}", updated_failure_actions);
 
-    println!("Enable failure actions on non crash failures");
+    println!("Enable failure actions on non-crash failures");
     service.set_failure_actions_on_non_crash_failures(true)?;
 
+    println!("Query failure actions on non-crash failures enabled");
     let failure_actions_flag = service.get_failure_actions_on_non_crash_failures()?;
     println!(
-        "Got failure actions on non crash failures: {}",
+        "Failure actions on non-crash failures enabled: {}",
         failure_actions_flag
     );
 

@@ -251,23 +251,21 @@ pub struct ServiceFailureActions {
     pub reset_period: ServiceFailureResetPeriod,
 
     /// The message to be broadcast to server users before rebooting in response to the
-    /// SC_ACTION_REBOOT service controller action.
+    /// `SC_ACTION_REBOOT` service controller action.
     ///
-    /// If this value is None, the reboot message is unchanged.
-    /// If the value is an empty string (""), the reboot message is deleted and no message is
-    /// broadcast.
+    /// If this value is `None`, the reboot message is unchanged.
+    /// If the value is an empty string, the reboot message is deleted and no message is broadcast.
     pub reboot_msg: Option<OsString>,
 
-    /// The command line of the process for the CreateProcess function to execute in response to
-    /// the SC_ACTION_RUN_COMMAND service controller action. This process runs under the same
-    /// account as the service.
+    /// The command line to execute in response to the `SC_ACTION_RUN_COMMAND` service controller
+    /// action. This process runs under the same account as the service.
     ///
-    /// If this value is None, the command is unchanged. If the value is an empty string (""),
-    /// the command is deleted and no program is run when the service fails.
+    /// If this value is `None`, the command is unchanged. If the value is an empty string, the
+    /// command is deleted and no program is run when the service fails.
     pub command: Option<OsString>,
 
     /// The array of actions to perform.
-    /// If this value is None, the reset_period member is ignored.
+    /// If this value is `N`one, the [`ServiceFailureActions::reset_period`] member is ignored.
     pub actions: Option<Vec<ServiceAction>>,
 }
 
@@ -760,8 +758,9 @@ impl Service {
         }
     }
 
-    /// Configure failure actions to run when the service terminates before reporting the "stopped"
-    /// [`ServiceState`] back to the system or if it exits with non-zero [`ServiceExitCode`].
+    /// Configure failure actions to run when the service terminates before reporting the
+    /// [`ServiceState::Stopped`] back to the system or if it exits with non-zero
+    /// [`ServiceExitCode`].
     ///
     /// Please refer to MSDN for more info:\
     /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-_service_failure_actions_flag>
@@ -780,6 +779,8 @@ impl Service {
         }
     }
 
+    /// Query the system for the boolean indication that the service is configured to run failure
+    /// actions on non-crash failures.
     pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
         let mut data = [0u8; 8096];
 
@@ -797,7 +798,7 @@ impl Service {
         Ok(result)
     }
 
-    /// Get failure actions from the system.
+    /// Query the configured failure actions for the service.
     pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
         unsafe {
             let mut data = [0u8; 8096];
@@ -811,8 +812,55 @@ impl Service {
     }
 
     /// Update failure actions.
-    /// Pass None for optional fields to keep the existing settings, or pass empty value to reset
-    /// them.
+    ///
+    /// Pass `None` for optional fields to keep the corresponding fields unchanged, or pass an empty
+    /// value to reset them.
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use std::ffi::OsString;
+    /// use std::time::Duration;
+    /// use windows_service::service::{
+    ///     ServiceAccess, ServiceAction, ServiceActionType, ServiceFailureActions,
+    ///     ServiceFailureResetPeriod,
+    /// };
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service(
+    ///     "my_service",
+    ///     ServiceAccess::START | ServiceAccess::CHANGE_CONFIG,
+    /// )?;
+    ///
+    /// let actions = vec![
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::Restart,
+    ///         delay: Duration::from_secs(5),
+    ///     },
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::RunCommand,
+    ///         delay: Duration::from_secs(10),
+    ///     },
+    ///     ServiceAction {
+    ///         action_type: ServiceActionType::None,
+    ///         delay: Duration::default(),
+    ///     },
+    /// ];
+    ///
+    /// let failure_actions = ServiceFailureActions {
+    ///     reset_period: ServiceFailureResetPeriod::After(Duration::from_secs(86400)),
+    ///     reboot_msg: None,
+    ///     command: Some(OsString::from("ping 127.0.0.1")),
+    ///     actions: Some(actions),
+    /// };
+    ///
+    /// my_service.update_failure_actions(failure_actions)?;
+    /// #    Ok(())
+    /// # }
+    /// ```
     pub fn update_failure_actions(&self, update: ServiceFailureActions) -> crate::Result<()> {
         let mut raw_failure_actions = unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONSW>() };
 
@@ -820,10 +868,9 @@ impl Service {
             .map_err(Error::InvalidServiceActionFailuresRebootMessage)?;
         let mut command =
             to_wide_slice(update.command).map_err(Error::InvalidServiceActionFailuresCommand)?;
-
         let mut sc_actions: Option<Vec<winsvc::SC_ACTION>> = update
             .actions
-            .map(|actions| actions.iter().map(|action| action.to_raw()).collect());
+            .map(|actions| actions.iter().map(ServiceAction::to_raw).collect());
 
         raw_failure_actions.dwResetPeriod = update.reset_period.to_raw();
         raw_failure_actions.lpRebootMsg = reboot_msg
