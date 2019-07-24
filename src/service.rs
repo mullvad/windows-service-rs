@@ -265,7 +265,7 @@ pub struct ServiceFailureActions {
     pub command: Option<OsString>,
 
     /// The array of actions to perform.
-    /// If this value is `N`one, the [`ServiceFailureActions::reset_period`] member is ignored.
+    /// If this value is `None`, the [`ServiceFailureActions::reset_period`] member is ignored.
     pub actions: Option<Vec<ServiceAction>>,
 }
 
