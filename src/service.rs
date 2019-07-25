@@ -3,10 +3,12 @@ use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
+use std::slice;
 use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{NulError, WideCStr, WideCString};
+use winapi::shared::guiddef::GUID;
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
@@ -427,43 +429,6 @@ impl ServiceConfig {
     }
 }
 
-/// Enum describing the event type of DeviceEvent
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeviceEventParam {
-    DeviceArrival(*mut dbt::DEV_BROADCAST_HDR),
-    DeviceQueryRemove(*mut dbt::DEV_BROADCAST_HDR),
-    DeviceQueryRemoveFailed(*mut dbt::DEV_BROADCAST_HDR),
-    DeviceRemoveComplete(*mut dbt::DEV_BROADCAST_HDR),
-    DeviceRemovePending(*mut dbt::DEV_BROADCAST_HDR),
-    CustomEvent(*mut dbt::DEV_BROADCAST_HDR),
- }
-
-impl DeviceEventParam {
-    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
-        match event_type as usize {
-            dbt::DBT_DEVICEARRIVAL => Ok(DeviceEventParam::DeviceArrival(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            dbt::DBT_DEVICEREMOVECOMPLETE => Ok(DeviceEventParam::DeviceRemoveComplete(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            dbt::DBT_DEVICEQUERYREMOVE => Ok(DeviceEventParam::DeviceQueryRemove(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            dbt::DBT_DEVICEQUERYREMOVEFAILED => Ok(DeviceEventParam::DeviceQueryRemoveFailed(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            dbt::DBT_DEVICEREMOVEPENDING => Ok(DeviceEventParam::DeviceRemovePending(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            dbt::DBT_CUSTOMEVENT => Ok(DeviceEventParam::CustomEvent(
-                event_data as *mut dbt::DEV_BROADCAST_HDR,
-            )),
-            _ => Err(ParseRawError(event_type)),
-        }
-    }
- }
-
 /// Enum describing the event type of HardwareProfileChange
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HardwareProfileChangeParam {
@@ -483,14 +448,41 @@ impl HardwareProfileChangeParam {
     }
 }
 
+/// Struct converted from winuser::POWERBROADCAST_SETTING
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PowerBroadcastSetting {
+    pub power_setting: String,
+    pub data: Vec<u8>,
+}
+
+impl PowerBroadcastSetting {
+    pub fn from_raw(data: *mut winuser::POWERBROADCAST_SETTING) -> Self {
+        unsafe {
+            let setting = *data;
+            let ptr = &setting.Data as *const u8;
+            PowerBroadcastSetting {
+                power_setting: Self::string_from_guid(&setting.PowerSetting),
+                data: slice::from_raw_parts(ptr, setting.DataLength as usize).to_vec(),
+            }
+        }
+    }
+
+    fn string_from_guid(guid: &GUID) -> String {
+        format!("{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
+            guid.Data1, guid.Data2, guid.Data3,
+            guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+            guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7])
+    }
+}
+
 /// Enum describing the event type of PowerEvent
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PowerEventParam {
     PowerStatusChange,
     ResumeAutomatic,
     ResumeSuspend,
     Suspend,
-    PowerSettingChange(*mut winuser::POWERBROADCAST_SETTING),
+    PowerSettingChange(PowerBroadcastSetting),
     BatteryLow,
     OemEvent,
     QuerySuspend,
@@ -506,7 +498,7 @@ impl PowerEventParam {
             winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
             winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
             winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
-                event_data as *mut winuser::POWERBROADCAST_SETTING,
+                PowerBroadcastSetting::from_raw(event_data as *mut winuser::POWERBROADCAST_SETTING),
             )),
             winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
             winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
@@ -520,55 +512,73 @@ impl PowerEventParam {
 
 /// Enum describing the event type of SessionChange
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SessionNotification {
+    pub size: u32,
+    pub session_id: u32,
+}
+
+impl SessionNotification {
+    pub fn from_raw(raw: *const winuser::WTSSESSION_NOTIFICATION) -> Self {
+        unsafe {
+            SessionNotification {
+                size: (*raw).cbSize,
+                session_id: (*raw).dwSessionId,
+            }
+        }
+    }
+}
+
+/// Enum describing the event type of SessionChange
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SessionChangeParam {
-    ConsoleConnect(*mut winuser::WTSSESSION_NOTIFICATION),
-    ConsoleDisconnect(*mut winuser::WTSSESSION_NOTIFICATION),
-    RemoteConnect(*mut winuser::WTSSESSION_NOTIFICATION),
-    RemoteDisconnect(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionLogon(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionLogoff(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionLock(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionUnlock(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionRemoteControl(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionCreate(*mut winuser::WTSSESSION_NOTIFICATION),
-    SessionTerminate(*mut winuser::WTSSESSION_NOTIFICATION),
+    ConsoleConnect(SessionNotification),
+    ConsoleDisconnect(SessionNotification),
+    RemoteConnect(SessionNotification),
+    RemoteDisconnect(SessionNotification),
+    SessionLogon(SessionNotification),
+    SessionLogoff(SessionNotification),
+    SessionLock(SessionNotification),
+    SessionUnlock(SessionNotification),
+    SessionRemoteControl(SessionNotification),
+    SessionCreate(SessionNotification),
+    SessionTerminate(SessionNotification),
 }
 
 impl SessionChangeParam {
     pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
         match event_type as usize {
             winuser::WTS_CONSOLE_CONNECT => Ok(SessionChangeParam::ConsoleConnect(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_CONSOLE_DISCONNECT => Ok(SessionChangeParam::ConsoleDisconnect(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_REMOTE_CONNECT => Ok(SessionChangeParam::RemoteConnect(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_REMOTE_DISCONNECT => Ok(SessionChangeParam::RemoteDisconnect(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_LOGON => Ok(SessionChangeParam::SessionLogon(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_LOGOFF => Ok(SessionChangeParam::SessionLogoff(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_LOCK => Ok(SessionChangeParam::SessionLock(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_UNLOCK => Ok(SessionChangeParam::SessionUnlock(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_REMOTE_CONTROL => Ok(SessionChangeParam::SessionRemoteControl(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_CREATE => Ok(SessionChangeParam::SessionCreate(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             winuser::WTS_SESSION_TERMINATE => Ok(SessionChangeParam::SessionTerminate(
-                event_data as *mut winuser::WTSSESSION_NOTIFICATION,
+                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
             )),
             _ => Err(ParseRawError(event_type)),
         }
@@ -576,7 +586,7 @@ impl SessionChangeParam {
 }
 
 /// Enum describing the service control operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ServiceControl {
     Continue,
     Interrogate,
@@ -589,7 +599,6 @@ pub enum ServiceControl {
     Preshutdown,
     Shutdown,
     Stop,
-    DeviceEvent(DeviceEventParam),
     HardwareProfileChange(HardwareProfileChangeParam),
     PowerEvent(PowerEventParam),
     SessionChange(SessionChangeParam),
@@ -611,8 +620,6 @@ impl ServiceControl {
             winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
             winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
             winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
-            winsvc::SERVICE_CONTROL_DEVICEEVENT => DeviceEventParam::from_event(
-                event_type, event_data).map(ServiceControl::DeviceEvent),
             winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => HardwareProfileChangeParam::from_event(
                 event_type).map(ServiceControl::HardwareProfileChange),
             winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
@@ -638,7 +645,6 @@ impl ServiceControl {
             ServiceControl::Preshutdown => winsvc::SERVICE_CONTROL_PRESHUTDOWN,
             ServiceControl::Shutdown => winsvc::SERVICE_CONTROL_SHUTDOWN,
             ServiceControl::Stop => winsvc::SERVICE_CONTROL_STOP,
-            ServiceControl::DeviceEvent(_) => winsvc::SERVICE_CONTROL_DEVICEEVENT,
             ServiceControl::HardwareProfileChange(_) => winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE,
             ServiceControl::PowerEvent(_) => winsvc::SERVICE_CONTROL_POWEREVENT,
             ServiceControl::SessionChange(_) => winsvc::SERVICE_CONTROL_SESSIONCHANGE,

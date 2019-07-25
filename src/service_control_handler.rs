@@ -137,16 +137,18 @@ where
 
     match ServiceControl::from_raw(control, event_type, event_data) {
         Ok(service_control) => {
+            let need_release = match service_control {
+                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => true,
+                _ => false,
+            };
+
             let return_code = event_handler(service_control).to_raw();
 
             // Important: release context upon Stop, Shutdown or Preshutdown at the end of the
             // service lifecycle.
-            match service_control {
-                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => {
-                    let _: Box<F> = unsafe { Box::from_raw(context as *mut F) };
-                }
-                _ => (),
-            };
+            if need_release {
+                let _: Box<F> = unsafe { Box::from_raw(context as *mut F) };
+            }
 
             return_code
         }
