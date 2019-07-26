@@ -3,12 +3,11 @@ use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
-use std::slice;
 use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{NulError, WideCStr, WideCString};
-use winapi::shared::guiddef::GUID;
+use winapi::shared::guiddef::{GUID, IsEqualGUID};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
@@ -431,52 +430,269 @@ impl ServiceConfig {
 
 /// Enum describing the event type of HardwareProfileChange
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
 pub enum HardwareProfileChangeParam {
-    ConfigChanged,
-    QueryChangeConfig,
-    ConfigChangeCanceled,
+    ConfigChanged = dbt::DBT_CONFIGCHANGED as u32,
+    QueryChangeConfig = dbt::DBT_QUERYCHANGECONFIG as u32,
+    ConfigChangeCanceled = dbt::DBT_CONFIGCHANGECANCELED as u32,
 }
 
 impl HardwareProfileChangeParam {
-    pub fn from_event(event_type: u32) -> Result<Self, ParseRawError> {
-        match event_type as usize {
-            dbt::DBT_CONFIGCHANGED => Ok(HardwareProfileChangeParam::ConfigChanged),
-            dbt::DBT_QUERYCHANGECONFIG => Ok(HardwareProfileChangeParam::QueryChangeConfig),
-            dbt::DBT_CONFIGCHANGECANCELED => Ok(HardwareProfileChangeParam::ConfigChangeCanceled),
-            _ => Err(ParseRawError(event_type)),
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
+        match raw {
+            x if x == HardwareProfileChangeParam::ConfigChanged.to_raw() => Ok(HardwareProfileChangeParam::ConfigChanged),
+            x if x == HardwareProfileChangeParam::QueryChangeConfig.to_raw() => Ok(HardwareProfileChangeParam::QueryChangeConfig),
+            x if x == HardwareProfileChangeParam::ConfigChangeCanceled.to_raw() => Ok(HardwareProfileChangeParam::ConfigChangeCanceled),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current power source
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum PowerSource {
+    Ac = 0,
+    Dc = 1,
+    Hot = 2,
+}
+
+impl PowerSource {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<PowerSource, ParseRawError> {
+        match raw {
+            x if x == PowerSource::Ac.to_raw() => Ok(PowerSource::Ac),
+            x if x == PowerSource::Dc.to_raw() => Ok(PowerSource::Dc),
+            x if x == PowerSource::Hot.to_raw() => Ok(PowerSource::Hot),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current monitor's display state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum DisplayState {
+    Off = 0,
+    On = 1,
+    Dimmed = 2,
+}
+
+impl DisplayState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<DisplayState, ParseRawError> {
+        match raw {
+            x if x == DisplayState::Off.to_raw() => Ok(DisplayState::Off),
+            x if x == DisplayState::On.to_raw() => Ok(DisplayState::On),
+            x if x == DisplayState::Dimmed.to_raw() => Ok(DisplayState::Dimmed),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the combined status of user presence
+/// across all local and remote sessions on the system
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum UserStatus {
+    Present = 0,
+    Inactive = 2,
+}
+
+impl UserStatus {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<UserStatus, ParseRawError> {
+        match raw {
+            x if x == UserStatus::Present.to_raw() => Ok(UserStatus::Present),
+            x if x == UserStatus::Inactive.to_raw() => Ok(UserStatus::Inactive),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the current monitor state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum MonitorState {
+    Off = 0,
+    On = 1,
+}
+
+impl MonitorState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<MonitorState, ParseRawError> {
+        match raw {
+            x if x == MonitorState::Off.to_raw() => Ok(MonitorState::Off),
+            x if x == MonitorState::On.to_raw() => Ok(MonitorState::On),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the battery saver state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum BatterySaverState {
+    Off = 0,
+    On = 1,
+}
+
+impl BatterySaverState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<BatterySaverState, ParseRawError> {
+        match raw {
+            x if x == BatterySaverState::Off.to_raw() => Ok(BatterySaverState::Off),
+            x if x == BatterySaverState::On.to_raw() => Ok(BatterySaverState::On),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+}
+
+/// Enum indicates the power scheme personality
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerSchemePersonality {
+    HighPerformance,
+    PowerSaver,
+    Automatic,
+}
+
+impl PowerSchemePersonality {
+    pub fn from_guid(guid: &GUID) -> Result<PowerSchemePersonality, ParseRawError> {
+        match guid {
+            x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => Ok(PowerSchemePersonality::HighPerformance),
+            x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => Ok(PowerSchemePersonality::PowerSaver),
+            x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => Ok(PowerSchemePersonality::Automatic),
+            // FIXME: ParseRawError accepts u32 only
+            _ => Err(ParseRawError(0)),
+        }
+    }
+}
+
+/// Enum indicates the current away mode state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum AwayModeState {
+    Exiting = 0,
+    Entering = 1,
+}
+
+impl AwayModeState {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<AwayModeState, ParseRawError> {
+        match raw {
+            x if x == AwayModeState::Exiting.to_raw() => Ok(AwayModeState::Exiting),
+            x if x == AwayModeState::Entering.to_raw() => Ok(AwayModeState::Entering),
+            _ => Err(ParseRawError(raw)),
         }
     }
 }
 
 /// Struct converted from winuser::POWERBROADCAST_SETTING
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PowerBroadcastSetting {
-    pub power_setting: String,
-    pub data: Vec<u8>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PowerBroadcastSetting {
+    AcdcPowerSource(PowerSource),
+    BatteryPercentageRemaining(u8),
+    ConsoleDisplayState(DisplayState),
+    GlobalUserPresence(UserStatus),
+    IdleBackgroundTask,
+    MonitorPowerOn(MonitorState),
+    PowerSavingStatus(BatterySaverState),
+    PowerSchemePersonality(PowerSchemePersonality),
+    SystemAwayMode(AwayModeState),
 }
 
 impl PowerBroadcastSetting {
-    pub fn from_raw(data: *mut winuser::POWERBROADCAST_SETTING) -> Self {
+    pub fn from_raw(raw: *mut winuser::POWERBROADCAST_SETTING) -> Result<PowerBroadcastSetting, ParseRawError> {
         unsafe {
-            let setting = *data;
-            let ptr = &setting.Data as *const u8;
-            PowerBroadcastSetting {
-                power_setting: Self::string_from_guid(&setting.PowerSetting),
-                data: slice::from_raw_parts(ptr, setting.DataLength as usize).to_vec(),
+            let setting = *raw;
+            let data = &setting.Data as *const u8;
+
+            match setting.PowerSetting {
+                x if IsEqualGUID(&x, &winnt::GUID_ACDC_POWER_SOURCE) => {
+                    let power_source = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::AcdcPowerSource(
+                        PowerSource::from_raw(power_source)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
+                    let percentage = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
+                        match percentage {
+                            x if x <= 100 => x as u8,
+                            _ => return Err(ParseRawError(percentage)),
+                        }
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
+                    let display_state = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::ConsoleDisplayState(
+                        DisplayState::from_raw(display_state)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
+                    let user_status = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::GlobalUserPresence(
+                        UserStatus::from_raw(user_status)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
+                    Ok(PowerBroadcastSetting::IdleBackgroundTask)
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_MONITOR_POWER_ON) => {
+                    let monitor_state = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::MonitorPowerOn(
+                        MonitorState::from_raw(monitor_state)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_POWER_SAVING_STATUS) => {
+                    let battery_saver_state = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::PowerSavingStatus(
+                        BatterySaverState::from_raw(battery_saver_state)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
+                    let guid = *(data as *const GUID);
+                    Ok(PowerBroadcastSetting::PowerSchemePersonality(
+                        PowerSchemePersonality::from_guid(&guid)?
+                    ))
+                }
+                x if IsEqualGUID(&x, &winnt::GUID_SYSTEM_AWAYMODE) => {
+                    let away_mode_state = *(data as *const u32);
+                    Ok(PowerBroadcastSetting::SystemAwayMode(
+                        AwayModeState::from_raw(away_mode_state)?
+                    ))
+                }
+                // FIXME: ParseRawError accepts u32 only
+                _ => Err(ParseRawError(0)),
             }
         }
     }
-
-    fn string_from_guid(guid: &GUID) -> String {
-        format!("{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
-            guid.Data1, guid.Data2, guid.Data3,
-            guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
-            guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7])
-    }
 }
 
-/// Enum describing the event type of PowerEvent
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Enum describing the PowerEvent event
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PowerEventParam {
     PowerStatusChange,
     ResumeAutomatic,
@@ -498,7 +714,7 @@ impl PowerEventParam {
             winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
             winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
             winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
-                PowerBroadcastSetting::from_raw(event_data as *mut winuser::POWERBROADCAST_SETTING),
+                PowerBroadcastSetting::from_raw(event_data as *mut winuser::POWERBROADCAST_SETTING)?
             )),
             winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
             winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
@@ -510,7 +726,47 @@ impl PowerEventParam {
     }
 }
 
-/// Enum describing the event type of SessionChange
+/// Enum describing the reason of a SessionChange event
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum SessionChangeReason {
+    ConsoleConnect = winuser::WTS_CONSOLE_CONNECT as u32,
+    ConsoleDisconnect = winuser::WTS_CONSOLE_DISCONNECT as u32,
+    RemoteConnect = winuser::WTS_REMOTE_CONNECT as u32,
+    RemoteDisconnect = winuser::WTS_REMOTE_DISCONNECT as u32,
+    SessionLogon = winuser::WTS_SESSION_LOGON as u32,
+    SessionLogoff = winuser::WTS_SESSION_LOGOFF as u32,
+    SessionLock = winuser::WTS_SESSION_LOCK as u32,
+    SessionUnlock = winuser::WTS_SESSION_UNLOCK as u32,
+    SessionRemoteControl = winuser::WTS_SESSION_REMOTE_CONTROL as u32,
+    SessionCreate = winuser::WTS_SESSION_CREATE as u32,
+    SessionTerminate = winuser::WTS_SESSION_TERMINATE as u32,
+}
+
+impl SessionChangeReason {
+    pub fn from_raw(raw: u32) -> Result<SessionChangeReason, ParseRawError> {
+        match raw {
+            x if x == SessionChangeReason::ConsoleConnect.to_raw() => Ok(SessionChangeReason::ConsoleConnect),
+            x if x == SessionChangeReason::ConsoleDisconnect.to_raw() => Ok(SessionChangeReason::ConsoleDisconnect),
+            x if x == SessionChangeReason::RemoteConnect.to_raw() => Ok(SessionChangeReason::RemoteConnect),
+            x if x == SessionChangeReason::RemoteDisconnect.to_raw() => Ok(SessionChangeReason::RemoteDisconnect),
+            x if x == SessionChangeReason::SessionLogon.to_raw() => Ok(SessionChangeReason::SessionLogon),
+            x if x == SessionChangeReason::SessionLogoff.to_raw() => Ok(SessionChangeReason::SessionLogoff),
+            x if x == SessionChangeReason::SessionLock.to_raw() => Ok(SessionChangeReason::SessionLock),
+            x if x == SessionChangeReason::SessionUnlock.to_raw() => Ok(SessionChangeReason::SessionUnlock),
+            x if x == SessionChangeReason::SessionRemoteControl.to_raw() => Ok(SessionChangeReason::SessionRemoteControl),
+            x if x == SessionChangeReason::SessionCreate.to_raw() => Ok(SessionChangeReason::SessionCreate),
+            x if x == SessionChangeReason::SessionTerminate.to_raw() => Ok(SessionChangeReason::SessionTerminate),
+            _ => Err(ParseRawError(raw)),
+        }
+    }
+
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+}
+
+/// Struct converted from winuser::WTSSESSION_NOTIFICATION
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionNotification {
     pub size: u32,
@@ -518,75 +774,34 @@ pub struct SessionNotification {
 }
 
 impl SessionNotification {
-    pub fn from_raw(raw: *const winuser::WTSSESSION_NOTIFICATION) -> Self {
-        unsafe {
-            SessionNotification {
-                size: (*raw).cbSize,
-                session_id: (*raw).dwSessionId,
-            }
+    pub fn from_raw(raw: winuser::WTSSESSION_NOTIFICATION) -> Self {
+        SessionNotification {
+            size: raw.cbSize,
+            session_id: raw.dwSessionId,
         }
     }
 }
 
-/// Enum describing the event type of SessionChange
+/// Struct describing the SessionChange event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SessionChangeParam {
-    ConsoleConnect(SessionNotification),
-    ConsoleDisconnect(SessionNotification),
-    RemoteConnect(SessionNotification),
-    RemoteDisconnect(SessionNotification),
-    SessionLogon(SessionNotification),
-    SessionLogoff(SessionNotification),
-    SessionLock(SessionNotification),
-    SessionUnlock(SessionNotification),
-    SessionRemoteControl(SessionNotification),
-    SessionCreate(SessionNotification),
-    SessionTerminate(SessionNotification),
+pub struct SessionChangeParam {
+    reason: SessionChangeReason,
+    notification: SessionNotification,
 }
 
 impl SessionChangeParam {
     pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
-        match event_type as usize {
-            winuser::WTS_CONSOLE_CONNECT => Ok(SessionChangeParam::ConsoleConnect(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_CONSOLE_DISCONNECT => Ok(SessionChangeParam::ConsoleDisconnect(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_REMOTE_CONNECT => Ok(SessionChangeParam::RemoteConnect(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_REMOTE_DISCONNECT => Ok(SessionChangeParam::RemoteDisconnect(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_LOGON => Ok(SessionChangeParam::SessionLogon(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_LOGOFF => Ok(SessionChangeParam::SessionLogoff(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_LOCK => Ok(SessionChangeParam::SessionLock(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_UNLOCK => Ok(SessionChangeParam::SessionUnlock(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_REMOTE_CONTROL => Ok(SessionChangeParam::SessionRemoteControl(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_CREATE => Ok(SessionChangeParam::SessionCreate(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            winuser::WTS_SESSION_TERMINATE => Ok(SessionChangeParam::SessionTerminate(
-                SessionNotification::from_raw(event_data as *const winuser::WTSSESSION_NOTIFICATION),
-            )),
-            _ => Err(ParseRawError(event_type)),
-        }
+        let notification = unsafe { *(event_data as *const winuser::WTSSESSION_NOTIFICATION) };
+
+        Ok(SessionChangeParam {
+            reason: SessionChangeReason::from_raw(event_type)?,
+            notification: SessionNotification::from_raw(notification),
+        })
     }
 }
 
 /// Enum describing the service control operations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceControl {
     Continue,
     Interrogate,
@@ -620,7 +835,7 @@ impl ServiceControl {
             winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
             winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
             winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
-            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => HardwareProfileChangeParam::from_event(
+            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => HardwareProfileChangeParam::from_raw(
                 event_type).map(ServiceControl::HardwareProfileChange),
             winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
                 event_type, event_data).map(ServiceControl::PowerEvent),
