@@ -795,8 +795,8 @@ impl SessionNotification {
 /// Struct describing the SessionChange event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionChangeParam {
-    reason: SessionChangeReason,
-    notification: SessionNotification,
+    pub reason: SessionChangeReason,
+    pub notification: SessionNotification,
 }
 
 impl SessionChangeParam {
