@@ -452,13 +452,14 @@ impl HardwareProfileChangeParam {
     }
 }
 
-/// Enum indicates the current power source
+/// Enum indicates the current power source as
+/// the Data member of GUID_ACDC_POWER_SOURCE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum PowerSource {
-    Ac = 0,
-    Dc = 1,
-    Hot = 2,
+    Ac = winnt::PoAc,
+    Dc = winnt::PoDc,
+    Hot = winnt::PoHot,
 }
 
 impl PowerSource {
@@ -476,7 +477,8 @@ impl PowerSource {
     }
 }
 
-/// Enum indicates the current monitor's display state
+/// Enum indicates the current monitor's display state as
+/// the Data member of GUID_CONSOLE_DISPLAY_STATE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum DisplayState {
@@ -501,12 +503,13 @@ impl DisplayState {
 }
 
 /// Enum indicates the combined status of user presence
-/// across all local and remote sessions on the system
+/// across all local and remote sessions on the system as
+/// the Data member of GUID_GLOBAL_USER_PRESENCE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum UserStatus {
-    Present = 0,
-    Inactive = 2,
+    Present = winnt::PowerUserPresent,
+    Inactive = winnt::PowerUserInactive,
 }
 
 impl UserStatus {
@@ -523,7 +526,8 @@ impl UserStatus {
     }
 }
 
-/// Enum indicates the current monitor state
+/// Enum indicates the current monitor state as
+/// the Data member of GUID_MONITOR_POWER_ON notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum MonitorState {
@@ -545,7 +549,8 @@ impl MonitorState {
     }
 }
 
-/// Enum indicates the battery saver state
+/// Enum indicates the battery saver state as
+/// the Data member of GUID_POWER_SAVING_STATUS notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum BatterySaverState {
@@ -567,7 +572,8 @@ impl BatterySaverState {
     }
 }
 
-/// Enum indicates the power scheme personality
+/// Enum indicates the power scheme personality as
+/// the Data member of GUID_POWERSCHEME_PERSONALITY notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PowerSchemePersonality {
     HighPerformance,
@@ -587,7 +593,8 @@ impl PowerSchemePersonality {
     }
 }
 
-/// Enum indicates the current away mode state
+/// Enum indicates the current away mode state as
+/// the Data member of GUID_SYSTEM_AWAYMODE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum AwayModeState {
@@ -610,6 +617,9 @@ impl AwayModeState {
 }
 
 /// Struct converted from winuser::POWERBROADCAST_SETTING
+///
+/// Please refer to MSDN for more info about the data members:
+/// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PowerBroadcastSetting {
     AcdcPowerSource(PowerSource),
@@ -790,8 +800,14 @@ pub struct SessionChangeParam {
 }
 
 impl SessionChangeParam {
-    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
-        let notification = unsafe { *(event_data as *const winuser::WTSSESSION_NOTIFICATION) };
+    /// Extract SessionChangeParam from `event_data`
+    ///
+    /// # Safety
+    ///
+    /// The `event_data` must be a valid winuser::WTSSESSION_NOTIFICATION pointer.
+    /// Otherwise, it is undefined behavior.
+    pub unsafe fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+        let notification = *(event_data as *const winuser::WTSSESSION_NOTIFICATION);
 
         Ok(SessionChangeParam {
             reason: SessionChangeReason::from_raw(event_type)?,
@@ -839,15 +855,15 @@ impl ServiceControl {
                 event_type).map(ServiceControl::HardwareProfileChange),
             winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
                 event_type, event_data).map(ServiceControl::PowerEvent),
-            winsvc::SERVICE_CONTROL_SESSIONCHANGE => SessionChangeParam::from_event(
-                event_type, event_data).map(ServiceControl::SessionChange),
+            winsvc::SERVICE_CONTROL_SESSIONCHANGE => unsafe { SessionChangeParam::from_event(
+                event_type, event_data) }.map(ServiceControl::SessionChange),
             winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
             _ => Err(ParseRawError(raw)),
         }
     }
 
-    pub fn to_raw(&self) -> u32 {
+    pub fn raw_service_control_type(&self) -> u32 {
         match self {
             ServiceControl::Continue => winsvc::SERVICE_CONTROL_CONTINUE,
             ServiceControl::Interrogate => winsvc::SERVICE_CONTROL_INTERROGATE,
@@ -1322,7 +1338,7 @@ impl Service {
         let success = unsafe {
             winsvc::ControlService(
                 self.service_handle.raw_handle(),
-                command.to_raw(),
+                command.raw_service_control_type(),
                 &mut raw_status,
             )
         };
