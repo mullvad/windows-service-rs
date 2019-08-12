@@ -634,69 +634,73 @@ pub enum PowerBroadcastSetting {
 }
 
 impl PowerBroadcastSetting {
-    pub fn from_raw(raw: *mut winuser::POWERBROADCAST_SETTING) -> Result<PowerBroadcastSetting, ParseRawError> {
-        unsafe {
-            let setting = *raw;
-            let data = &setting.Data as *const u8;
+    /// Extract PowerBroadcastSetting from `raw`
+    ///
+    /// # Safety
+    ///
+    /// The `raw` must be a valid winuser::POWERBROADCAST_SETTING pointer.
+    /// Otherwise, it is undefined behavior.
+    pub unsafe fn from_raw(raw: *mut c_void) -> Result<PowerBroadcastSetting, ParseRawError> {
+        let setting = *(raw as *const winuser::POWERBROADCAST_SETTING);
+        let data = &setting.Data as *const u8;
 
-            match setting.PowerSetting {
-                x if IsEqualGUID(&x, &winnt::GUID_ACDC_POWER_SOURCE) => {
-                    let power_source = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::AcdcPowerSource(
-                        PowerSource::from_raw(power_source)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
-                    let percentage = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
-                        match percentage {
-                            x if x <= 100 => x as u8,
-                            _ => return Err(ParseRawError(percentage)),
-                        }
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
-                    let display_state = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::ConsoleDisplayState(
-                        DisplayState::from_raw(display_state)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
-                    let user_status = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::GlobalUserPresence(
-                        UserStatus::from_raw(user_status)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
-                    Ok(PowerBroadcastSetting::IdleBackgroundTask)
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_MONITOR_POWER_ON) => {
-                    let monitor_state = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::MonitorPowerOn(
-                        MonitorState::from_raw(monitor_state)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_POWER_SAVING_STATUS) => {
-                    let battery_saver_state = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::PowerSavingStatus(
-                        BatterySaverState::from_raw(battery_saver_state)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
-                    let guid = *(data as *const GUID);
-                    Ok(PowerBroadcastSetting::PowerSchemePersonality(
-                        PowerSchemePersonality::from_guid(&guid)?
-                    ))
-                }
-                x if IsEqualGUID(&x, &winnt::GUID_SYSTEM_AWAYMODE) => {
-                    let away_mode_state = *(data as *const u32);
-                    Ok(PowerBroadcastSetting::SystemAwayMode(
-                        AwayModeState::from_raw(away_mode_state)?
-                    ))
-                }
-                // FIXME: ParseRawError accepts u32 only
-                _ => Err(ParseRawError(0)),
+        match setting.PowerSetting {
+            x if IsEqualGUID(&x, &winnt::GUID_ACDC_POWER_SOURCE) => {
+                let power_source = *(data as *const u32);
+                Ok(PowerBroadcastSetting::AcdcPowerSource(
+                    PowerSource::from_raw(power_source)?
+                ))
             }
+            x if IsEqualGUID(&x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
+                let percentage = *(data as *const u32);
+                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
+                    match percentage {
+                        x if x <= 100 => x as u8,
+                        _ => return Err(ParseRawError(percentage)),
+                    }
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
+                let display_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::ConsoleDisplayState(
+                    DisplayState::from_raw(display_state)?
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
+                let user_status = *(data as *const u32);
+                Ok(PowerBroadcastSetting::GlobalUserPresence(
+                    UserStatus::from_raw(user_status)?
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
+                Ok(PowerBroadcastSetting::IdleBackgroundTask)
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_MONITOR_POWER_ON) => {
+                let monitor_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::MonitorPowerOn(
+                    MonitorState::from_raw(monitor_state)?
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_POWER_SAVING_STATUS) => {
+                let battery_saver_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::PowerSavingStatus(
+                    BatterySaverState::from_raw(battery_saver_state)?
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
+                let guid = *(data as *const GUID);
+                Ok(PowerBroadcastSetting::PowerSchemePersonality(
+                    PowerSchemePersonality::from_guid(&guid)?
+                ))
+            }
+            x if IsEqualGUID(&x, &winnt::GUID_SYSTEM_AWAYMODE) => {
+                let away_mode_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::SystemAwayMode(
+                    AwayModeState::from_raw(away_mode_state)?
+                ))
+            }
+            // FIXME: ParseRawError accepts u32 only
+            _ => Err(ParseRawError(0)),
         }
     }
 }
@@ -717,14 +721,21 @@ pub enum PowerEventParam {
 }
 
 impl PowerEventParam {
-    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+    /// Extract PowerEventParam from `event_type` and `event_data`
+    ///
+    /// # Safety
+    ///
+    /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
+    /// Please refer to MSDN for more info about the requirements:
+    /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
+    pub unsafe fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
         match event_type as usize {
             winuser::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
             winuser::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
             winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
             winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
             winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
-                PowerBroadcastSetting::from_raw(event_data as *mut winuser::POWERBROADCAST_SETTING)?
+                PowerBroadcastSetting::from_raw(event_data)?
             )),
             winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
             winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
@@ -838,7 +849,14 @@ pub enum ServiceControl {
 }
 
 impl ServiceControl {
-    pub fn from_raw(raw: u32, event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+    /// Convert to ServiceControl from parameters received by `service_control_handler`
+    ///
+    /// # Safety
+    ///
+    /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
+    /// Please refer to MSDN for more info about the requirements:
+    /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
+    pub unsafe fn from_raw(raw: u32, event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
         match raw {
             winsvc::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
             winsvc::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
@@ -855,8 +873,8 @@ impl ServiceControl {
                 event_type).map(ServiceControl::HardwareProfileChange),
             winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
                 event_type, event_data).map(ServiceControl::PowerEvent),
-            winsvc::SERVICE_CONTROL_SESSIONCHANGE => unsafe { SessionChangeParam::from_event(
-                event_type, event_data) }.map(ServiceControl::SessionChange),
+            winsvc::SERVICE_CONTROL_SESSIONCHANGE => SessionChangeParam::from_event(
+                event_type, event_data).map(ServiceControl::SessionChange),
             winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
             _ => Err(ParseRawError(raw)),

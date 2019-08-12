@@ -135,7 +135,7 @@ where
     // Important: cast context to &mut F without taking ownership.
     let event_handler: &mut F = unsafe { &mut *(context as *mut F) };
 
-    match ServiceControl::from_raw(control, event_type, event_data) {
+    match unsafe { ServiceControl::from_raw(control, event_type, event_data) } {
         Ok(service_control) => {
             let need_release = match service_control {
                 ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => true,
