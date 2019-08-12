@@ -482,9 +482,9 @@ impl PowerSource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum DisplayState {
-    Off = 0,
-    On = 1,
-    Dimmed = 2,
+    Off = winnt::PowerMonitorOff,
+    On = winnt::PowerMonitorOn,
+    Dimmed = winnt::PowerMonitorDim,
 }
 
 impl DisplayState {
