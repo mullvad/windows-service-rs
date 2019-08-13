@@ -93,7 +93,7 @@ impl ServiceStartType {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -121,7 +121,7 @@ impl ServiceErrorControl {
             x if x == ServiceErrorControl::Ignore.to_raw() => Ok(ServiceErrorControl::Ignore),
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -185,7 +185,7 @@ impl ServiceActionType {
             x if x == ServiceActionType::Reboot.to_raw() => Ok(ServiceActionType::Reboot),
             x if x == ServiceActionType::Restart.to_raw() => Ok(ServiceActionType::Restart),
             x if x == ServiceActionType::RunCommand.to_raw() => Ok(ServiceActionType::RunCommand),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -447,7 +447,7 @@ impl HardwareProfileChangeParam {
             x if x == HardwareProfileChangeParam::ConfigChanged.to_raw() => Ok(HardwareProfileChangeParam::ConfigChanged),
             x if x == HardwareProfileChangeParam::QueryChangeConfig.to_raw() => Ok(HardwareProfileChangeParam::QueryChangeConfig),
             x if x == HardwareProfileChangeParam::ConfigChangeCanceled.to_raw() => Ok(HardwareProfileChangeParam::ConfigChangeCanceled),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -472,7 +472,7 @@ impl PowerSource {
             x if x == PowerSource::Ac.to_raw() => Ok(PowerSource::Ac),
             x if x == PowerSource::Dc.to_raw() => Ok(PowerSource::Dc),
             x if x == PowerSource::Hot.to_raw() => Ok(PowerSource::Hot),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -497,7 +497,7 @@ impl DisplayState {
             x if x == DisplayState::Off.to_raw() => Ok(DisplayState::Off),
             x if x == DisplayState::On.to_raw() => Ok(DisplayState::On),
             x if x == DisplayState::Dimmed.to_raw() => Ok(DisplayState::Dimmed),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -521,7 +521,7 @@ impl UserStatus {
         match raw {
             x if x == UserStatus::Present.to_raw() => Ok(UserStatus::Present),
             x if x == UserStatus::Inactive.to_raw() => Ok(UserStatus::Inactive),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -544,7 +544,7 @@ impl MonitorState {
         match raw {
             x if x == MonitorState::Off.to_raw() => Ok(MonitorState::Off),
             x if x == MonitorState::On.to_raw() => Ok(MonitorState::On),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -567,7 +567,7 @@ impl BatterySaverState {
         match raw {
             x if x == BatterySaverState::Off.to_raw() => Ok(BatterySaverState::Off),
             x if x == BatterySaverState::On.to_raw() => Ok(BatterySaverState::On),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -587,8 +587,7 @@ impl PowerSchemePersonality {
             x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => Ok(PowerSchemePersonality::HighPerformance),
             x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => Ok(PowerSchemePersonality::PowerSaver),
             x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => Ok(PowerSchemePersonality::Automatic),
-            // FIXME: ParseRawError accepts u32 only
-            _ => Err(ParseRawError(0)),
+            x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
         }
     }
 }
@@ -611,7 +610,7 @@ impl AwayModeState {
         match raw {
             x if x == AwayModeState::Exiting.to_raw() => Ok(AwayModeState::Exiting),
             x if x == AwayModeState::Entering.to_raw() => Ok(AwayModeState::Entering),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 }
@@ -623,7 +622,7 @@ impl AwayModeState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PowerBroadcastSetting {
     AcdcPowerSource(PowerSource),
-    BatteryPercentageRemaining(u8),
+    BatteryPercentageRemaining(u32),
     ConsoleDisplayState(DisplayState),
     GlobalUserPresence(UserStatus),
     IdleBackgroundTask,
@@ -641,66 +640,60 @@ impl PowerBroadcastSetting {
     /// The `raw` must be a valid winuser::POWERBROADCAST_SETTING pointer.
     /// Otherwise, it is undefined behavior.
     pub unsafe fn from_raw(raw: *mut c_void) -> Result<PowerBroadcastSetting, ParseRawError> {
-        let setting = *(raw as *const winuser::POWERBROADCAST_SETTING);
+        let setting = &*(raw as *const winuser::POWERBROADCAST_SETTING);
         let data = &setting.Data as *const u8;
 
-        match setting.PowerSetting {
-            x if IsEqualGUID(&x, &winnt::GUID_ACDC_POWER_SOURCE) => {
+        match &setting.PowerSetting {
+            x if IsEqualGUID(x, &winnt::GUID_ACDC_POWER_SOURCE) => {
                 let power_source = *(data as *const u32);
                 Ok(PowerBroadcastSetting::AcdcPowerSource(
                     PowerSource::from_raw(power_source)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
+            x if IsEqualGUID(x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
                 let percentage = *(data as *const u32);
-                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
-                    match percentage {
-                        x if x <= 100 => x as u8,
-                        _ => return Err(ParseRawError(percentage)),
-                    }
-                ))
+                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(percentage))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
+            x if IsEqualGUID(x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
                 let display_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::ConsoleDisplayState(
                     DisplayState::from_raw(display_state)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
+            x if IsEqualGUID(x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
                 let user_status = *(data as *const u32);
                 Ok(PowerBroadcastSetting::GlobalUserPresence(
                     UserStatus::from_raw(user_status)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
+            x if IsEqualGUID(x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
                 Ok(PowerBroadcastSetting::IdleBackgroundTask)
             }
-            x if IsEqualGUID(&x, &winnt::GUID_MONITOR_POWER_ON) => {
+            x if IsEqualGUID(x, &winnt::GUID_MONITOR_POWER_ON) => {
                 let monitor_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::MonitorPowerOn(
                     MonitorState::from_raw(monitor_state)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_POWER_SAVING_STATUS) => {
+            x if IsEqualGUID(x, &winnt::GUID_POWER_SAVING_STATUS) => {
                 let battery_saver_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::PowerSavingStatus(
                     BatterySaverState::from_raw(battery_saver_state)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
+            x if IsEqualGUID(x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
                 let guid = *(data as *const GUID);
                 Ok(PowerBroadcastSetting::PowerSchemePersonality(
                     PowerSchemePersonality::from_guid(&guid)?
                 ))
             }
-            x if IsEqualGUID(&x, &winnt::GUID_SYSTEM_AWAYMODE) => {
+            x if IsEqualGUID(x, &winnt::GUID_SYSTEM_AWAYMODE) => {
                 let away_mode_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::SystemAwayMode(
                     AwayModeState::from_raw(away_mode_state)?
                 ))
             }
-            // FIXME: ParseRawError accepts u32 only
-            _ => Err(ParseRawError(0)),
+            x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
         }
     }
 }
@@ -742,7 +735,7 @@ impl PowerEventParam {
             winuser::PBT_APMQUERYSUSPEND => Ok(PowerEventParam::QuerySuspend),
             winuser::PBT_APMQUERYSUSPENDFAILED => Ok(PowerEventParam::QuerySuspendFailed),
             winuser::PBT_APMRESUMECRITICAL => Ok(PowerEventParam::ResumeCritical),
-            _ => Err(ParseRawError(event_type)),
+            _ => Err(ParseRawError::InvalidInteger(event_type)),
         }
     }
 }
@@ -778,7 +771,7 @@ impl SessionChangeReason {
             x if x == SessionChangeReason::SessionRemoteControl.to_raw() => Ok(SessionChangeReason::SessionRemoteControl),
             x if x == SessionChangeReason::SessionCreate.to_raw() => Ok(SessionChangeReason::SessionCreate),
             x if x == SessionChangeReason::SessionTerminate.to_raw() => Ok(SessionChangeReason::SessionTerminate),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
@@ -877,7 +870,7 @@ impl ServiceControl {
                 event_type, event_data).map(ServiceControl::SessionChange),
             winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
@@ -926,7 +919,7 @@ impl ServiceState {
             x if x == ServiceState::ContinuePending.to_raw() => Ok(ServiceState::ContinuePending),
             x if x == ServiceState::PausePending.to_raw() => Ok(ServiceState::PausePending),
             x if x == ServiceState::Paused.to_raw() => Ok(ServiceState::Paused),
-            _ => Err(ParseRawError(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
@@ -1418,8 +1411,20 @@ fn to_wide_slice<T: AsRef<OsStr>>(
 
 
 #[derive(err_derive::Error, Debug)]
-#[error(display = "Invalid integer value for the target type: {}", _0)]
-pub struct ParseRawError(u32);
+pub enum ParseRawError {
+    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    InvalidInteger(u32),
+
+    #[error(display = "Invalid GUID value for the target type: {}", _0)]
+    InvalidGuid(String),
+}
+
+fn string_from_guid(guid: &GUID) -> String {
+    format!("{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
+        guid.Data1, guid.Data2, guid.Data3,
+        guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+        guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7])
+}
 
 #[cfg(test)]
 mod tests {
