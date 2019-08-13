@@ -7,7 +7,7 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{NulError, WideCStr, WideCString};
-use winapi::shared::guiddef::{GUID, IsEqualGUID};
+use winapi::shared::guiddef::{IsEqualGUID, GUID};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
@@ -444,9 +444,15 @@ impl HardwareProfileChangeParam {
 
     pub fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
         match raw {
-            x if x == HardwareProfileChangeParam::ConfigChanged.to_raw() => Ok(HardwareProfileChangeParam::ConfigChanged),
-            x if x == HardwareProfileChangeParam::QueryChangeConfig.to_raw() => Ok(HardwareProfileChangeParam::QueryChangeConfig),
-            x if x == HardwareProfileChangeParam::ConfigChangeCanceled.to_raw() => Ok(HardwareProfileChangeParam::ConfigChangeCanceled),
+            x if x == HardwareProfileChangeParam::ConfigChanged.to_raw() => {
+                Ok(HardwareProfileChangeParam::ConfigChanged)
+            }
+            x if x == HardwareProfileChangeParam::QueryChangeConfig.to_raw() => {
+                Ok(HardwareProfileChangeParam::QueryChangeConfig)
+            }
+            x if x == HardwareProfileChangeParam::ConfigChangeCanceled.to_raw() => {
+                Ok(HardwareProfileChangeParam::ConfigChangeCanceled)
+            }
             _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
@@ -584,9 +590,15 @@ pub enum PowerSchemePersonality {
 impl PowerSchemePersonality {
     pub fn from_guid(guid: &GUID) -> Result<PowerSchemePersonality, ParseRawError> {
         match guid {
-            x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => Ok(PowerSchemePersonality::HighPerformance),
-            x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => Ok(PowerSchemePersonality::PowerSaver),
-            x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => Ok(PowerSchemePersonality::Automatic),
+            x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::HighPerformance)
+            }
+            x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::PowerSaver)
+            }
+            x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => {
+                Ok(PowerSchemePersonality::Automatic)
+            }
             x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
         }
     }
@@ -647,23 +659,25 @@ impl PowerBroadcastSetting {
             x if IsEqualGUID(x, &winnt::GUID_ACDC_POWER_SOURCE) => {
                 let power_source = *(data as *const u32);
                 Ok(PowerBroadcastSetting::AcdcPowerSource(
-                    PowerSource::from_raw(power_source)?
+                    PowerSource::from_raw(power_source)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
                 let percentage = *(data as *const u32);
-                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(percentage))
+                Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
+                    percentage,
+                ))
             }
             x if IsEqualGUID(x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
                 let display_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::ConsoleDisplayState(
-                    DisplayState::from_raw(display_state)?
+                    DisplayState::from_raw(display_state)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
                 let user_status = *(data as *const u32);
                 Ok(PowerBroadcastSetting::GlobalUserPresence(
-                    UserStatus::from_raw(user_status)?
+                    UserStatus::from_raw(user_status)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
@@ -672,25 +686,25 @@ impl PowerBroadcastSetting {
             x if IsEqualGUID(x, &winnt::GUID_MONITOR_POWER_ON) => {
                 let monitor_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::MonitorPowerOn(
-                    MonitorState::from_raw(monitor_state)?
+                    MonitorState::from_raw(monitor_state)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_POWER_SAVING_STATUS) => {
                 let battery_saver_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::PowerSavingStatus(
-                    BatterySaverState::from_raw(battery_saver_state)?
+                    BatterySaverState::from_raw(battery_saver_state)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
                 let guid = *(data as *const GUID);
                 Ok(PowerBroadcastSetting::PowerSchemePersonality(
-                    PowerSchemePersonality::from_guid(&guid)?
+                    PowerSchemePersonality::from_guid(&guid)?,
                 ))
             }
             x if IsEqualGUID(x, &winnt::GUID_SYSTEM_AWAYMODE) => {
                 let away_mode_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::SystemAwayMode(
-                    AwayModeState::from_raw(away_mode_state)?
+                    AwayModeState::from_raw(away_mode_state)?,
                 ))
             }
             x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
@@ -721,14 +735,17 @@ impl PowerEventParam {
     /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
     /// Please refer to MSDN for more info about the requirements:
     /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
-    pub unsafe fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+    pub unsafe fn from_event(
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
         match event_type as usize {
             winuser::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
             winuser::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
             winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
             winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
             winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
-                PowerBroadcastSetting::from_raw(event_data)?
+                PowerBroadcastSetting::from_raw(event_data)?,
             )),
             winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
             winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
@@ -760,17 +777,39 @@ pub enum SessionChangeReason {
 impl SessionChangeReason {
     pub fn from_raw(raw: u32) -> Result<SessionChangeReason, ParseRawError> {
         match raw {
-            x if x == SessionChangeReason::ConsoleConnect.to_raw() => Ok(SessionChangeReason::ConsoleConnect),
-            x if x == SessionChangeReason::ConsoleDisconnect.to_raw() => Ok(SessionChangeReason::ConsoleDisconnect),
-            x if x == SessionChangeReason::RemoteConnect.to_raw() => Ok(SessionChangeReason::RemoteConnect),
-            x if x == SessionChangeReason::RemoteDisconnect.to_raw() => Ok(SessionChangeReason::RemoteDisconnect),
-            x if x == SessionChangeReason::SessionLogon.to_raw() => Ok(SessionChangeReason::SessionLogon),
-            x if x == SessionChangeReason::SessionLogoff.to_raw() => Ok(SessionChangeReason::SessionLogoff),
-            x if x == SessionChangeReason::SessionLock.to_raw() => Ok(SessionChangeReason::SessionLock),
-            x if x == SessionChangeReason::SessionUnlock.to_raw() => Ok(SessionChangeReason::SessionUnlock),
-            x if x == SessionChangeReason::SessionRemoteControl.to_raw() => Ok(SessionChangeReason::SessionRemoteControl),
-            x if x == SessionChangeReason::SessionCreate.to_raw() => Ok(SessionChangeReason::SessionCreate),
-            x if x == SessionChangeReason::SessionTerminate.to_raw() => Ok(SessionChangeReason::SessionTerminate),
+            x if x == SessionChangeReason::ConsoleConnect.to_raw() => {
+                Ok(SessionChangeReason::ConsoleConnect)
+            }
+            x if x == SessionChangeReason::ConsoleDisconnect.to_raw() => {
+                Ok(SessionChangeReason::ConsoleDisconnect)
+            }
+            x if x == SessionChangeReason::RemoteConnect.to_raw() => {
+                Ok(SessionChangeReason::RemoteConnect)
+            }
+            x if x == SessionChangeReason::RemoteDisconnect.to_raw() => {
+                Ok(SessionChangeReason::RemoteDisconnect)
+            }
+            x if x == SessionChangeReason::SessionLogon.to_raw() => {
+                Ok(SessionChangeReason::SessionLogon)
+            }
+            x if x == SessionChangeReason::SessionLogoff.to_raw() => {
+                Ok(SessionChangeReason::SessionLogoff)
+            }
+            x if x == SessionChangeReason::SessionLock.to_raw() => {
+                Ok(SessionChangeReason::SessionLock)
+            }
+            x if x == SessionChangeReason::SessionUnlock.to_raw() => {
+                Ok(SessionChangeReason::SessionUnlock)
+            }
+            x if x == SessionChangeReason::SessionRemoteControl.to_raw() => {
+                Ok(SessionChangeReason::SessionRemoteControl)
+            }
+            x if x == SessionChangeReason::SessionCreate.to_raw() => {
+                Ok(SessionChangeReason::SessionCreate)
+            }
+            x if x == SessionChangeReason::SessionTerminate.to_raw() => {
+                Ok(SessionChangeReason::SessionTerminate)
+            }
             _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
@@ -810,7 +849,10 @@ impl SessionChangeParam {
     ///
     /// The `event_data` must be a valid winuser::WTSSESSION_NOTIFICATION pointer.
     /// Otherwise, it is undefined behavior.
-    pub unsafe fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+    pub unsafe fn from_event(
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
         let notification = *(event_data as *const winuser::WTSSESSION_NOTIFICATION);
 
         Ok(SessionChangeParam {
@@ -849,7 +891,11 @@ impl ServiceControl {
     /// Invalid `event_data` pointer may cause undefined behavior in some circumstances.
     /// Please refer to MSDN for more info about the requirements:
     /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/nc-winsvc-lphandler_function_ex>
-    pub unsafe fn from_raw(raw: u32, event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+    pub unsafe fn from_raw(
+        raw: u32,
+        event_type: u32,
+        event_data: *mut c_void,
+    ) -> Result<Self, ParseRawError> {
         match raw {
             winsvc::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
             winsvc::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
@@ -862,12 +908,17 @@ impl ServiceControl {
             winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
             winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
             winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
-            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => HardwareProfileChangeParam::from_raw(
-                event_type).map(ServiceControl::HardwareProfileChange),
-            winsvc::SERVICE_CONTROL_POWEREVENT => PowerEventParam::from_event(
-                event_type, event_data).map(ServiceControl::PowerEvent),
-            winsvc::SERVICE_CONTROL_SESSIONCHANGE => SessionChangeParam::from_event(
-                event_type, event_data).map(ServiceControl::SessionChange),
+            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => {
+                HardwareProfileChangeParam::from_raw(event_type)
+                    .map(ServiceControl::HardwareProfileChange)
+            }
+            winsvc::SERVICE_CONTROL_POWEREVENT => {
+                PowerEventParam::from_event(event_type, event_data).map(ServiceControl::PowerEvent)
+            }
+            winsvc::SERVICE_CONTROL_SESSIONCHANGE => {
+                SessionChangeParam::from_event(event_type, event_data)
+                    .map(ServiceControl::SessionChange)
+            }
             winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
             _ => Err(ParseRawError::InvalidInteger(raw)),
@@ -887,7 +938,9 @@ impl ServiceControl {
             ServiceControl::Preshutdown => winsvc::SERVICE_CONTROL_PRESHUTDOWN,
             ServiceControl::Shutdown => winsvc::SERVICE_CONTROL_SHUTDOWN,
             ServiceControl::Stop => winsvc::SERVICE_CONTROL_STOP,
-            ServiceControl::HardwareProfileChange(_) => winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE,
+            ServiceControl::HardwareProfileChange(_) => {
+                winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE
+            }
             ServiceControl::PowerEvent(_) => winsvc::SERVICE_CONTROL_POWEREVENT,
             ServiceControl::SessionChange(_) => winsvc::SERVICE_CONTROL_SESSIONCHANGE,
             ServiceControl::TimeChange => winsvc::SERVICE_CONTROL_TIMECHANGE,
@@ -1409,7 +1462,6 @@ fn to_wide_slice<T: AsRef<OsStr>>(
     }
 }
 
-
 #[derive(err_derive::Error, Debug)]
 pub enum ParseRawError {
     #[error(display = "Invalid integer value for the target type: {}", _0)]
@@ -1420,10 +1472,20 @@ pub enum ParseRawError {
 }
 
 fn string_from_guid(guid: &GUID) -> String {
-    format!("{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
-        guid.Data1, guid.Data2, guid.Data3,
-        guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
-        guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7])
+    format!(
+        "{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
+        guid.Data1,
+        guid.Data2,
+        guid.Data3,
+        guid.Data4[0],
+        guid.Data4[1],
+        guid.Data4[2],
+        guid.Data4[3],
+        guid.Data4[4],
+        guid.Data4[5],
+        guid.Data4[6],
+        guid.Data4[7]
+    )
 }
 
 #[cfg(test)]

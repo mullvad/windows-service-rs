@@ -138,7 +138,9 @@ where
     match unsafe { ServiceControl::from_raw(control, event_type, event_data) } {
         Ok(service_control) => {
             let need_release = match service_control {
-                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => true,
+                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => {
+                    true
+                }
                 _ => false,
             };
 
