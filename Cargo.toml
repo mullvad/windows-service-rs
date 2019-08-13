@@ -13,5 +13,5 @@ edition = "2018"
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.0.1"
 err-derive = "0.1.5"
-winapi = { git = "https://github.com/mullvad/winapi-rs.git", rev = "4bcf5cab87124bbeef8c1a445137494d874f8082", features = ["std", "winsvc", "winbase", "winerror"] }
+winapi = { git = "https://github.com/mullvad/winapi-rs.git", rev = "4bcf5cab87124bbeef8c1a445137494d874f8082", features = ["dbt", "std", "winbase", "winerror", "winsvc"] }
 widestring = "0.3.0"
