@@ -245,6 +245,10 @@ pub enum Error {
     #[error(display = "Invalid service action failures command")]
     InvalidServiceActionFailuresCommand(#[error(cause)] widestring::NulError),
 
+    /// Invalid description
+    #[error(display = "Invalid service description")]
+    InvalidServiceDescription(#[error(cause)] widestring::NulError),
+
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]
     Winapi(#[error(cause)] std::io::Error),
