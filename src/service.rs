@@ -1280,6 +1280,21 @@ impl Service {
         }
     }
 
+    /// Set description text of the service.
+    ///
+    /// Note that you need `CHANGE_CONFIG` service access to do this.
+    pub fn set_description(&self, description: &OsStr) -> crate::Result<()> {
+        let mut data = to_wide_slice(Some(description))
+            .map_err(Error::InvalidServiceDescription)?;
+        unsafe {
+            self.change_config2(
+                winsvc::SERVICE_CONFIG_DESCRIPTION,
+                &mut data,
+            )
+            .map_err(Error::Winapi)
+        }
+    }
+
     /// Configure failure actions to run when the service terminates before reporting the
     /// [`ServiceState::Stopped`] back to the system or if it exits with non-zero
     /// [`ServiceExitCode`].
