@@ -1240,7 +1240,7 @@ impl Service {
     /// Get the service config from the system.
     pub fn query_config(&self) -> crate::Result<ServiceConfig> {
         // As per docs, the maximum size of data buffer used by QueryServiceConfigW is 8K
-        let mut data = [0u8; 8096];
+        let mut data = [0u8; MAX_QUERY_BUFFER_SIZE];
         let mut bytes_written: u32 = 0;
 
         let success = unsafe {
@@ -1286,7 +1286,7 @@ impl Service {
     /// Query the system for the boolean indication that the service is configured to run failure
     /// actions on non-crash failures.
     pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
-        let mut data = [0u8; 8096];
+        let mut data = [0u8; MAX_QUERY_BUFFER_SIZE];
 
         let raw_failure_actions_flag: winsvc::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
             self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
@@ -1305,7 +1305,7 @@ impl Service {
     /// Query the configured failure actions for the service.
     pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
         unsafe {
-            let mut data = [0u8; 8096];
+            let mut data = [0u8; MAX_QUERY_BUFFER_SIZE];
 
             let raw_failure_actions: winsvc::SERVICE_FAILURE_ACTIONSW = self
                 .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
@@ -1415,8 +1415,7 @@ impl Service {
     }
 
     /// Private helper to query the optional configuration parameters of windows services.
-    /// As per docs, the maximum size of data buffer used by QueryServiceConfig2W is 8K
-    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; 8096]) -> io::Result<T> {
+    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; MAX_QUERY_BUFFER_SIZE]) -> io::Result<T> {
         let mut bytes_written: u32 = 0;
 
         let success = winsvc::QueryServiceConfig2W(
@@ -1449,6 +1448,9 @@ impl Service {
         }
     }
 }
+
+/// The maximum size of data buffer used by QueryServiceConfigW and QueryServiceConfig2W is 8K
+const MAX_QUERY_BUFFER_SIZE: usize = 8 * 1024;
 
 fn to_wide_slice<T: AsRef<OsStr>>(
     s: Option<T>,
