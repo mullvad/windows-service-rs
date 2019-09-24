@@ -138,9 +138,9 @@ impl ServiceManager {
         service_access: ServiceAccess,
     ) -> Result<Service> {
         let service_name =
-            WideCString::from_str(service_info.name).map_err(Error::InvalidServiceName)?;
-        let display_name =
-            WideCString::from_str(service_info.display_name).map_err(Error::InvalidDisplayName)?;
+            WideCString::from_os_str(service_info.name).map_err(Error::InvalidServiceName)?;
+        let display_name = WideCString::from_os_str(service_info.display_name)
+            .map_err(Error::InvalidDisplayName)?;
         let account_name = to_wide(service_info.account_name).map_err(Error::InvalidAccountName)?;
         let account_password =
             to_wide(service_info.account_password).map_err(Error::InvalidAccountPassword)?;
@@ -159,8 +159,9 @@ impl ServiceManager {
             launch_command_buffer.push(wide);
         }
 
-        let launch_command = WideCString::from_wide_str(launch_command_buffer)
-            .expect("launch_command_buffer invalidly formatted");
+        // Safety: We are sure launch_command_buffer does not contain nulls
+        let launch_command =
+            unsafe { WideCString::from_vec_unchecked(launch_command_buffer.into_vec()) };
 
         let dependency_identifiers: Vec<OsString> = service_info
             .dependencies
@@ -218,12 +219,12 @@ impl ServiceManager {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn open_service<T: AsRef<OsStr>>(
+    pub fn open_service(
         &self,
-        name: T,
+        name: impl AsRef<OsStr>,
         request_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name = WideCString::from_str(name).map_err(Error::InvalidServiceName)?;
+        let service_name = WideCString::from_os_str(name).map_err(Error::InvalidServiceName)?;
         let service_handle = unsafe {
             winsvc::OpenServiceW(
                 self.manager_handle.raw_handle(),
@@ -240,16 +241,19 @@ impl ServiceManager {
     }
 }
 
-fn to_wide<T: AsRef<OsStr>>(s: Option<T>) -> ::std::result::Result<Option<WideCString>, NulError> {
+fn to_wide(
+    s: Option<impl AsRef<OsStr>>,
+) -> ::std::result::Result<Option<WideCString>, NulError<u16>> {
     if let Some(s) = s {
-        Ok(Some(WideCString::from_str(s)?))
+        Ok(Some(WideCString::from_os_str(s)?))
     } else {
         Ok(None)
     }
 }
 
-fn escape_wide<T: AsRef<OsStr>>(s: T) -> ::std::result::Result<WideString, NulError> {
+/// Escapes a given string, but also checks it does not contain any null bytes
+fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, NulError<u16>> {
     let escaped = shell_escape::escape(Cow::Borrowed(s.as_ref()));
-    let wide = WideCString::from_str(escaped)?;
-    Ok(wide.to_wide_string())
+    let _ = WideCString::from_os_str(&escaped)?;
+    Ok(WideString::from_os_str(&escaped))
 }

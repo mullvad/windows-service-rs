@@ -183,43 +183,43 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
-    InvalidAccountName(#[error(cause)] widestring::NulError),
+    InvalidAccountName(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid account password.
     #[error(display = "Invalid account password")]
-    InvalidAccountPassword(#[error(cause)] widestring::NulError),
+    InvalidAccountPassword(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid display name.
     #[error(display = "Invalid display name")]
-    InvalidDisplayName(#[error(cause)] widestring::NulError),
+    InvalidDisplayName(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid database name.
     #[error(display = "Invalid database name")]
-    InvalidDatabaseName(#[error(cause)] widestring::NulError),
+    InvalidDatabaseName(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid executable path.
     #[error(display = "Invalid executable path")]
-    InvalidExecutablePath(#[error(cause)] widestring::NulError),
+    InvalidExecutablePath(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid launch arguments.
     #[error(display = "Invalid launch argument")]
-    InvalidLaunchArgument(#[error(cause)] widestring::NulError),
+    InvalidLaunchArgument(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid dependency name.
     #[error(display = "Invalid dependency name")]
-    InvalidDependency(#[error(cause)] widestring::NulError),
+    InvalidDependency(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid machine name.
     #[error(display = "Invalid machine name")]
-    InvalidMachineName(#[error(cause)] widestring::NulError),
+    InvalidMachineName(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid service name.
     #[error(display = "Invalid service name")]
-    InvalidServiceName(#[error(cause)] widestring::NulError),
+    InvalidServiceName(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid start argument.
     #[error(display = "Invalid start argument")]
-    InvalidStartArgument(#[error(cause)] widestring::NulError),
+    InvalidStartArgument(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid raw representation of [`ServiceState`].
     #[error(display = "Invalid service state value")]
@@ -239,11 +239,11 @@ pub enum Error {
 
     /// Invalid reboot message
     #[error(display = "Invalid service action failures reboot message")]
-    InvalidServiceActionFailuresRebootMessage(#[error(cause)] widestring::NulError),
+    InvalidServiceActionFailuresRebootMessage(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid command
     #[error(display = "Invalid service action failures command")]
-    InvalidServiceActionFailuresCommand(#[error(cause)] widestring::NulError),
+    InvalidServiceActionFailuresCommand(#[error(cause)] widestring::NulError<u16>),
 
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]
