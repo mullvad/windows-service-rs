@@ -152,8 +152,9 @@ impl ServiceManager {
         let mut launch_command_buffer = WideString::new();
         launch_command_buffer.push(executable_path);
 
-        for launch_argument in service_info.launch_arguments.iter() {
-            let wide = escape_wide(launch_argument).map_err(Error::InvalidLaunchArgument)?;
+        for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
+            let wide =
+                escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
 
             launch_command_buffer.push_str(" ");
             launch_command_buffer.push(wide);

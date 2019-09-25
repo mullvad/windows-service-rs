@@ -202,8 +202,8 @@ pub enum Error {
     InvalidExecutablePath(#[error(cause)] widestring::NulError<u16>),
 
     /// Invalid launch arguments.
-    #[error(display = "Invalid launch argument")]
-    InvalidLaunchArgument(#[error(cause)] widestring::NulError<u16>),
+    #[error(display = "Invalid launch argument at index {}", _0)]
+    InvalidLaunchArgument(usize, #[error(cause)] widestring::NulError<u16>),
 
     /// Invalid dependency name.
     #[error(display = "Invalid dependency name")]
