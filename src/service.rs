@@ -1415,7 +1415,11 @@ impl Service {
     }
 
     /// Private helper to query the optional configuration parameters of windows services.
-    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; MAX_QUERY_BUFFER_SIZE]) -> io::Result<T> {
+    unsafe fn query_config2<T: Copy>(
+        &self,
+        kind: DWORD,
+        data: &mut [u8; MAX_QUERY_BUFFER_SIZE],
+    ) -> io::Result<T> {
         let mut bytes_written: u32 = 0;
 
         let success = winsvc::QueryServiceConfig2W(
