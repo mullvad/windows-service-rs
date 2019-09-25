@@ -161,8 +161,7 @@ impl ServiceManager {
         }
 
         // Safety: We are sure launch_command_buffer does not contain nulls
-        let launch_command =
-            unsafe { WideCString::from_vec_unchecked(launch_command_buffer.into_vec()) };
+        let launch_command = unsafe { WideCString::from_ustr_unchecked(launch_command_buffer) };
 
         let dependency_identifiers: Vec<OsString> = service_info
             .dependencies
