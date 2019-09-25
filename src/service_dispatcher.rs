@@ -87,11 +87,11 @@ macro_rules! define_windows_service {
 ///     Ok(())
 /// }
 /// ```
-pub fn start<T: AsRef<OsStr>>(
-    service_name: T,
+pub fn start(
+    service_name: impl AsRef<OsStr>,
     service_main: extern "system" fn(u32, *mut *mut u16),
 ) -> Result<()> {
-    let service_name = WideCString::from_str(service_name).map_err(Error::InvalidServiceName)?;
+    let service_name = WideCString::from_os_str(service_name).map_err(Error::InvalidServiceName)?;
     let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[
         winsvc::SERVICE_TABLE_ENTRYW {
             lpServiceName: service_name.as_ptr(),

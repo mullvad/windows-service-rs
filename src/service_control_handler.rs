@@ -92,9 +92,8 @@ impl ServiceControlHandlerResult {
 ///
 /// # fn main() {}
 /// ```
-pub fn register<S, F>(service_name: S, event_handler: F) -> Result<ServiceStatusHandle>
+pub fn register<F>(service_name: impl AsRef<OsStr>, event_handler: F) -> Result<ServiceStatusHandle>
 where
-    S: AsRef<OsStr>,
     F: FnMut(ServiceControl) -> ServiceControlHandlerResult + 'static + Send,
 {
     // Move closure to heap.
@@ -103,7 +102,7 @@ where
     // Important: leak the Box<F> which will be released in `service_control_handler`.
     let context: *mut F = Box::into_raw(heap_event_handler);
 
-    let service_name = WideCString::from_str(service_name).map_err(Error::InvalidServiceName)?;
+    let service_name = WideCString::from_os_str(service_name).map_err(Error::InvalidServiceName)?;
     let status_handle = unsafe {
         winsvc::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),

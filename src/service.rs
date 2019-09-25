@@ -1185,10 +1185,10 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> crate::Result<()> {
+    pub fn start(&self, service_arguments: &[impl AsRef<OsStr>]) -> crate::Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
-            .map(|s| WideCString::from_str(s).map_err(Error::InvalidStartArgument))
+            .map(|s| WideCString::from_os_str(s).map_err(Error::InvalidStartArgument))
             .collect::<crate::Result<Vec<WideCString>>>()?;
 
         let mut raw_service_arguments: Vec<*const u16> =
@@ -1415,7 +1415,11 @@ impl Service {
     }
 
     /// Private helper to query the optional configuration parameters of windows services.
-    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8; MAX_QUERY_BUFFER_SIZE]) -> io::Result<T> {
+    unsafe fn query_config2<T: Copy>(
+        &self,
+        kind: DWORD,
+        data: &mut [u8; MAX_QUERY_BUFFER_SIZE],
+    ) -> io::Result<T> {
         let mut bytes_written: u32 = 0;
 
         let success = winsvc::QueryServiceConfig2W(
@@ -1452,12 +1456,12 @@ impl Service {
 /// The maximum size of data buffer used by QueryServiceConfigW and QueryServiceConfig2W is 8K
 const MAX_QUERY_BUFFER_SIZE: usize = 8 * 1024;
 
-fn to_wide_slice<T: AsRef<OsStr>>(
-    s: Option<T>,
-) -> ::std::result::Result<Option<Vec<u16>>, NulError> {
+fn to_wide_slice(
+    s: Option<impl AsRef<OsStr>>,
+) -> ::std::result::Result<Option<Vec<u16>>, NulError<u16>> {
     if let Some(s) = s {
         Ok(Some(
-            WideCString::from_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
+            WideCString::from_os_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
         ))
     } else {
         Ok(None)

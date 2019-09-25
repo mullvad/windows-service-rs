@@ -135,5 +135,4 @@ mod ping_service {
 
         Ok(())
     }
-
 }
