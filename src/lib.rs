@@ -180,74 +180,75 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(err_derive::Error, Debug)]
+#[error(no_from)]
 pub enum Error {
     /// Invalid account name.
     #[error(display = "Invalid account name")]
-    InvalidAccountName(#[error(cause)] widestring::NulError<u16>),
+    InvalidAccountName(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid account password.
     #[error(display = "Invalid account password")]
-    InvalidAccountPassword(#[error(cause)] widestring::NulError<u16>),
+    InvalidAccountPassword(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid display name.
     #[error(display = "Invalid display name")]
-    InvalidDisplayName(#[error(cause)] widestring::NulError<u16>),
+    InvalidDisplayName(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid database name.
     #[error(display = "Invalid database name")]
-    InvalidDatabaseName(#[error(cause)] widestring::NulError<u16>),
+    InvalidDatabaseName(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid executable path.
     #[error(display = "Invalid executable path")]
-    InvalidExecutablePath(#[error(cause)] widestring::NulError<u16>),
+    InvalidExecutablePath(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid launch arguments.
     #[error(display = "Invalid launch argument at index {}", _0)]
-    InvalidLaunchArgument(usize, #[error(cause)] widestring::NulError<u16>),
+    InvalidLaunchArgument(usize, #[error(source)] widestring::NulError<u16>),
 
     /// Invalid dependency name.
     #[error(display = "Invalid dependency name")]
-    InvalidDependency(#[error(cause)] widestring::NulError<u16>),
+    InvalidDependency(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid machine name.
     #[error(display = "Invalid machine name")]
-    InvalidMachineName(#[error(cause)] widestring::NulError<u16>),
+    InvalidMachineName(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid service name.
     #[error(display = "Invalid service name")]
-    InvalidServiceName(#[error(cause)] widestring::NulError<u16>),
+    InvalidServiceName(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid start argument.
     #[error(display = "Invalid start argument")]
-    InvalidStartArgument(#[error(cause)] widestring::NulError<u16>),
+    InvalidStartArgument(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid raw representation of [`ServiceState`].
     #[error(display = "Invalid service state value")]
-    InvalidServiceState(#[error(cause)] service::ParseRawError),
+    InvalidServiceState(#[error(source)] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceStartType`].
     #[error(display = "Invalid service start value")]
-    InvalidServiceStartType(#[error(cause)] service::ParseRawError),
+    InvalidServiceStartType(#[error(source)] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceErrorControl`].
     #[error(display = "Invalid service error control value")]
-    InvalidServiceErrorControl(#[error(cause)] service::ParseRawError),
+    InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceActionType`]
     #[error(display = "Invalid service action type")]
-    InvalidServiceActionType(#[error(cause)] service::ParseRawError),
+    InvalidServiceActionType(#[error(source)] service::ParseRawError),
 
     /// Invalid reboot message
     #[error(display = "Invalid service action failures reboot message")]
-    InvalidServiceActionFailuresRebootMessage(#[error(cause)] widestring::NulError<u16>),
+    InvalidServiceActionFailuresRebootMessage(#[error(source)] widestring::NulError<u16>),
 
     /// Invalid command
     #[error(display = "Invalid service action failures command")]
-    InvalidServiceActionFailuresCommand(#[error(cause)] widestring::NulError<u16>),
+    InvalidServiceActionFailuresCommand(#[error(source)] widestring::NulError<u16>),
 
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]
-    Winapi(#[error(cause)] std::io::Error),
+    Winapi(#[error(source)] std::io::Error),
 }
 
 mod sc_handle;

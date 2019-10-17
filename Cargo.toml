@@ -15,6 +15,6 @@ default-target = "x86_64-pc-windows-msvc"
 
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.2"
-err-derive = "0.1.5"
+err-derive = "0.2.1"
 winapi = { git = "https://github.com/mullvad/winapi-rs.git", rev = "4bcf5cab87124bbeef8c1a445137494d874f8082", features = ["dbt", "std", "winbase", "winerror", "winsvc"] }
 widestring = "0.4.0"
