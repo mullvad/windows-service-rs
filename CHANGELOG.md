@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `Service::set_failure_actions_on_non_crash_failures`, 
   `Service::get_failure_actions_on_non_crash_failures`)
 
+### Changed
+- Bumped the MSRV to 1.32, because of err-derive which depend on quote
+
 ## [0.2.0] - 2019-04-01
 ### Added
 - Add `ServiceExitCode::NO_ERROR` constant for easy access to the success value.
