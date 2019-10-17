@@ -30,7 +30,7 @@ environment:
       RUST_VERSION: nightly
     # Testing on oldest supported version of Rust
     - TARGET: x86_64-pc-windows-msvc
-      RUST_VERSION: 1.31.0
+      RUST_VERSION: 1.32.0
 
 install:
   - ps: >-
