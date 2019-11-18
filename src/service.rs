@@ -207,14 +207,14 @@ impl ServiceAction {
         Ok(ServiceAction {
             action_type: ServiceActionType::from_raw(raw.Type)
                 .map_err(Error::InvalidServiceActionType)?,
-            delay: Duration::from_secs(raw.Delay as u64),
+            delay: Duration::from_millis(raw.Delay as u64),
         })
     }
 
     pub fn to_raw(&self) -> winsvc::SC_ACTION {
         winsvc::SC_ACTION {
             Type: self.action_type.to_raw(),
-            Delay: self.delay.as_secs() as DWORD,
+            Delay: (self.delay.as_secs() * 1000) as DWORD,
         }
     }
 }
