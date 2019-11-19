@@ -214,7 +214,7 @@ impl ServiceAction {
     pub fn to_raw(&self) -> winsvc::SC_ACTION {
         winsvc::SC_ACTION {
             Type: self.action_type.to_raw(),
-            Delay: (self.delay.as_secs() * 1000) as DWORD,
+            Delay: self.delay.as_millis() as DWORD,
         }
     }
 }
@@ -1132,8 +1132,7 @@ impl ServiceStatus {
 
         raw_status.dwCheckPoint = self.checkpoint;
 
-        // we lose precision here but dwWaitHint should never be too big.
-        raw_status.dwWaitHint = (self.wait_hint.as_secs() * 1000) as u32;
+        raw_status.dwWaitHint = self.wait_hint.as_millis() as u32;
 
         raw_status
     }
