@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `Service::get_failure_actions_on_non_crash_failures`)
 
 ### Changed
-- Bumped the MSRV to 1.33, because of err-derive upgrade which depend on quote, and to use
-  `Duration::as_millis()`.
+- Bumped the MSRV to 1.34, because of err-derive upgrade which depend on quote, to use
+  `Duration::as_millis()` and the `TryFrom` trait.
 
 ## [0.2.0] - 2019-04-01
 ### Added

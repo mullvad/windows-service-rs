@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
@@ -199,6 +200,11 @@ pub struct ServiceAction {
     pub action_type: ServiceActionType,
 
     /// The time to wait before performing the specified action
+    ///
+    /// # Panics
+    ///
+    /// Converting this to the FFI form will panic if the delay is too large to fit as milliseconds
+    /// in a `DWORD`.
     pub delay: Duration,
 }
 
@@ -214,12 +220,17 @@ impl ServiceAction {
     pub fn to_raw(&self) -> winsvc::SC_ACTION {
         winsvc::SC_ACTION {
             Type: self.action_type.to_raw(),
-            Delay: self.delay.as_millis() as DWORD,
+            Delay: DWORD::try_from(self.delay.as_millis()).expect("Too long delay"),
         }
     }
 }
 
 /// A enum that representats the reset period for the failure counter.
+///
+/// # Panics
+///
+/// Converting this to the FFI form will panic if the period is too large to fit as seconds in a
+/// `DWORD`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceFailureResetPeriod {
     Never,
@@ -237,7 +248,9 @@ impl ServiceFailureResetPeriod {
     pub fn to_raw(&self) -> DWORD {
         match self {
             ServiceFailureResetPeriod::Never => INFINITE,
-            ServiceFailureResetPeriod::After(ref duration) => duration.as_secs() as DWORD,
+            ServiceFailureResetPeriod::After(duration) => {
+                DWORD::try_from(duration.as_secs()).expect("Too long reset period")
+            }
         }
     }
 }
@@ -1118,6 +1131,11 @@ pub struct ServiceStatus {
     /// This basically works as a timeout until the system assumes that the service hung.
     /// This could be either circumvented by updating the [`ServiceStatus::current_state`] or
     /// incrementing a [`ServiceStatus::checkpoint`] value.
+    ///
+    /// # Panics
+    ///
+    /// Converting this to the FFI form will panic if the duration is too large to fit as
+    /// milliseconds in a `DWORD`.
     pub wait_hint: Duration,
 }
 
@@ -1132,7 +1150,8 @@ impl ServiceStatus {
 
         raw_status.dwCheckPoint = self.checkpoint;
 
-        raw_status.dwWaitHint = self.wait_hint.as_millis() as u32;
+        raw_status.dwWaitHint =
+            DWORD::try_from(self.wait_hint.as_millis()).expect("Too long wait_hint");
 
         raw_status
     }
