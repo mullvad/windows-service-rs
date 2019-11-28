@@ -248,7 +248,7 @@ pub enum Error {
 
     /// Invalid description
     #[error(display = "Invalid service description")]
-    InvalidServiceDescription(#[error(cause)] widestring::NulError),
+    InvalidServiceDescription(#[error(cause)] widestring::NulError<u16>),
 
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]

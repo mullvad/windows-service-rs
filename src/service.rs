@@ -1284,14 +1284,15 @@ impl Service {
     ///
     /// Note that you need `CHANGE_CONFIG` service access to do this.
     pub fn set_description(&self, description: &OsStr) -> crate::Result<()> {
-        let mut data = to_wide_slice(Some(description))
+        let mut str_vec = to_wide_slice(Some(description))
             .map_err(Error::InvalidServiceDescription)?;
+        let mut data = unsafe { mem::zeroed::<winsvc::SERVICE_DESCRIPTIONW>() };
+        data.lpDescription = str_vec.as_mut()
+            .map_or(ptr::null_mut(), |s| s.as_mut_ptr());
+
         unsafe {
-            self.change_config2(
-                winsvc::SERVICE_CONFIG_DESCRIPTION,
-                &mut data,
-            )
-            .map_err(Error::Winapi)
+            self.change_config2(winsvc::SERVICE_CONFIG_DESCRIPTION, &mut data)
+                .map_err(Error::Winapi)
         }
     }
 
