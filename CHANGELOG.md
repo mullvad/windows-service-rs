@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- Add support for configuring the service SID info.
 - Add support for changing mandatory configuration settings on service.
 - Add support for service failure actions. (See: `ServiceFailureActions`, 
   `Service::update_failure_actions`, `Service::get_failure_actions`, 
