@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
+- Add support for configuring the service SID info.
+- Add support for changing mandatory configuration settings on service.
 - Add support for service failure actions. (See: `ServiceFailureActions`, 
   `Service::update_failure_actions`, `Service::get_failure_actions`, 
   `Service::set_failure_actions_on_non_crash_failures`, 
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Bumped the MSRV to 1.34, because of err-derive upgrade which depend on quote, to use
   `Duration::as_millis()` and the `TryFrom` trait.
+- Breaking: `ServiceManager::create_service()` now expects a borrowed `ServiceInfo` argument.
 
 ## [0.2.0] - 2019-04-01
 ### Added
