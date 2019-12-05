@@ -1,15 +1,11 @@
-use std::borrow::Cow;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::{io, ptr};
 
-use widestring::{NulError, WideCString, WideString};
+use widestring::WideCString;
 use winapi::um::winsvc;
 
-use crate::double_nul_terminated;
 use crate::sc_handle::ScHandle;
-use crate::service::{Service, ServiceAccess, ServiceInfo};
-use crate::shell_escape;
-
+use crate::service::{to_wide, RawServiceInfo, Service, ServiceAccess, ServiceInfo};
 use crate::{Error, Result};
 
 bitflags::bitflags! {
@@ -128,66 +124,38 @@ impl ServiceManager {
     ///         account_password: None,
     ///     };
     ///
-    ///     let my_service = manager.create_service(my_service_info, ServiceAccess::QUERY_STATUS)?;
+    ///     let my_service = manager.create_service(&my_service_info, ServiceAccess::QUERY_STATUS)?;
     ///     Ok(())
     /// }
     /// ```
     pub fn create_service(
         &self,
-        service_info: ServiceInfo,
+        service_info: &ServiceInfo,
         service_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name =
-            WideCString::from_os_str(service_info.name).map_err(Error::InvalidServiceName)?;
-        let display_name = WideCString::from_os_str(service_info.display_name)
-            .map_err(Error::InvalidDisplayName)?;
-        let account_name = to_wide(service_info.account_name).map_err(Error::InvalidAccountName)?;
-        let account_password =
-            to_wide(service_info.account_password).map_err(Error::InvalidAccountPassword)?;
-
-        // escape executable path and arguments and combine them into single command
-        let executable_path =
-            escape_wide(service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
-
-        let mut launch_command_buffer = WideString::new();
-        launch_command_buffer.push(executable_path);
-
-        for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
-            let wide =
-                escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
-
-            launch_command_buffer.push_str(" ");
-            launch_command_buffer.push(wide);
-        }
-
-        // Safety: We are sure launch_command_buffer does not contain nulls
-        let launch_command = unsafe { WideCString::from_ustr_unchecked(launch_command_buffer) };
-
-        let dependency_identifiers: Vec<OsString> = service_info
-            .dependencies
-            .iter()
-            .map(|dependency| dependency.to_system_identifier())
-            .collect();
-        let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
-            .map_err(Error::InvalidDependency)?;
-
+        let raw_info = RawServiceInfo::new(service_info)?;
         let service_handle = unsafe {
             winsvc::CreateServiceW(
                 self.manager_handle.raw_handle(),
-                service_name.as_ptr(),
-                display_name.as_ptr(),
+                raw_info.name.as_ptr(),
+                raw_info.display_name.as_ptr(),
                 service_access.bits(),
-                service_info.service_type.bits(),
-                service_info.start_type.to_raw(),
-                service_info.error_control.to_raw(),
-                launch_command.as_ptr(),
+                raw_info.service_type,
+                raw_info.start_type,
+                raw_info.error_control,
+                raw_info.launch_command.as_ptr(),
                 ptr::null(),     // load ordering group
                 ptr::null_mut(), // tag id within the load ordering group
-                joined_dependencies
+                raw_info
+                    .dependencies
                     .as_ref()
                     .map_or(ptr::null(), |s| s.as_ptr()),
-                account_name.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
-                account_password
+                raw_info
+                    .account_name
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
+                raw_info
+                    .account_password
                     .as_ref()
                     .map_or(ptr::null(), |s| s.as_ptr()),
             )
@@ -239,21 +207,4 @@ impl ServiceManager {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
         }
     }
-}
-
-fn to_wide(
-    s: Option<impl AsRef<OsStr>>,
-) -> ::std::result::Result<Option<WideCString>, NulError<u16>> {
-    if let Some(s) = s {
-        Ok(Some(WideCString::from_os_str(s)?))
-    } else {
-        Ok(None)
-    }
-}
-
-/// Escapes a given string, but also checks it does not contain any null bytes
-fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, NulError<u16>> {
-    let escaped = shell_escape::escape(Cow::Borrowed(s.as_ref()));
-    let wide = WideCString::from_os_str(&escaped)?;
-    Ok(wide.to_ustring())
 }

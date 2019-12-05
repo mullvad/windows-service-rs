@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
@@ -7,7 +8,7 @@ use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
 
-use widestring::{NulError, WideCStr, WideCString};
+use widestring::{NulError, WideCStr, WideCString, WideString};
 use winapi::shared::guiddef::{IsEqualGUID, GUID};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
@@ -15,6 +16,7 @@ use winapi::um::winbase::INFINITE;
 use winapi::um::{dbt, winnt, winsvc, winuser};
 
 use crate::sc_handle::ScHandle;
+use crate::shell_escape;
 use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
@@ -360,6 +362,91 @@ pub struct ServiceInfo {
     /// For system accounts this should normally be `None`.
     pub account_password: Option<OsString>,
 }
+
+/// Same as `ServiceInfo` but with fields that are compatible with the Windows API.
+pub(crate) struct RawServiceInfo {
+    /// Service name
+    pub name: WideCString,
+
+    /// User-friendly service name
+    pub display_name: WideCString,
+
+    /// The service type
+    pub service_type: DWORD,
+
+    /// The service startup options
+    pub start_type: DWORD,
+
+    /// The severity of the error, and action taken, if this service fails to start.
+    pub error_control: DWORD,
+
+    /// Path to the service binary with arguments appended
+    pub launch_command: WideCString,
+
+    /// Service dependencies
+    pub dependencies: Option<WideString>,
+
+    /// Account to use for running the service.
+    /// for example: NT Authority\System.
+    /// use `None` to run as LocalSystem.
+    pub account_name: Option<WideCString>,
+
+    /// Account password.
+    /// For system accounts this should normally be `None`.
+    pub account_password: Option<WideCString>,
+}
+
+impl RawServiceInfo {
+    pub fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
+        let service_name =
+            WideCString::from_os_str(&service_info.name).map_err(Error::InvalidServiceName)?;
+        let display_name = WideCString::from_os_str(&service_info.display_name)
+            .map_err(Error::InvalidDisplayName)?;
+        let account_name =
+            to_wide(service_info.account_name.as_ref()).map_err(Error::InvalidAccountName)?;
+        let account_password = to_wide(service_info.account_password.as_ref())
+            .map_err(Error::InvalidAccountPassword)?;
+
+        // escape executable path and arguments and combine them into single command
+        let executable_path =
+            escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+
+        let mut launch_command_buffer = WideString::new();
+        launch_command_buffer.push(executable_path);
+
+        for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
+            let wide =
+                escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
+
+            launch_command_buffer.push_str(" ");
+            launch_command_buffer.push(wide);
+        }
+
+        // Safety: We are sure launch_command_buffer does not contain nulls
+        let launch_command = unsafe { WideCString::from_ustr_unchecked(launch_command_buffer) };
+
+        let dependency_identifiers: Vec<OsString> = service_info
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.to_system_identifier())
+            .collect();
+        let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
+            .map_err(Error::InvalidDependency)?;
+
+        Ok(Self {
+            name: service_name,
+            display_name: display_name,
+            service_type: service_info.service_type.bits(),
+            start_type: service_info.start_type.to_raw(),
+            error_control: service_info.error_control.to_raw(),
+            launch_command: launch_command,
+            dependencies: joined_dependencies,
+            account_name: account_name,
+            account_password: account_password,
+        })
+    }
+}
+
 
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1280,6 +1367,48 @@ impl Service {
         }
     }
 
+    /// Update the service config.
+    /// Caveat: You cannot reset the account name/password by passing NULL.
+    ///
+    /// This implementation does not currently expose the full flexibility of the
+    /// `ChangeServiceConfigW` API. When calling the API it's possible to pass NULL in place of
+    /// any of the string arguments to indicate that they should not be updated.
+    ///
+    /// If we wanted to support this we wouldn't be able to reuse the `ServiceInfo` struct.
+    pub fn change_config(&self, service_info: &ServiceInfo) -> crate::Result<()> {
+        let raw_info = RawServiceInfo::new(service_info)?;
+        let success = unsafe {
+            winsvc::ChangeServiceConfigW(
+                self.service_handle.raw_handle(),
+                raw_info.service_type,
+                raw_info.start_type,
+                raw_info.error_control,
+                raw_info.launch_command.as_ptr(),
+                ptr::null(),     // load ordering group
+                ptr::null_mut(), // tag id within the load ordering group
+                raw_info
+                    .dependencies
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
+                raw_info
+                    .account_name
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
+                raw_info
+                    .account_password
+                    .as_ref()
+                    .map_or(ptr::null(), |s| s.as_ptr()),
+                raw_info.display_name.as_ptr(),
+            )
+        };
+
+        if success == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            Ok(())
+        }
+    }
+
     /// Configure failure actions to run when the service terminates before reporting the
     /// [`ServiceState::Stopped`] back to the system or if it exits with non-zero
     /// [`ServiceExitCode`].
@@ -1510,6 +1639,23 @@ fn string_from_guid(guid: &GUID) -> String {
         guid.Data4[6],
         guid.Data4[7]
     )
+}
+
+pub(crate) fn to_wide(
+    s: Option<impl AsRef<OsStr>>,
+) -> ::std::result::Result<Option<WideCString>, NulError<u16>> {
+    if let Some(s) = s {
+        Ok(Some(WideCString::from_os_str(s)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Escapes a given string, but also checks it does not contain any null bytes
+fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, NulError<u16>> {
+    let escaped = shell_escape::escape(Cow::Borrowed(s.as_ref()));
+    let wide = WideCString::from_os_str(&escaped)?;
+    Ok(wide.to_ustring())
 }
 
 #[cfg(test)]
