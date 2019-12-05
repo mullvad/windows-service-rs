@@ -1260,6 +1260,16 @@ impl ServiceStatus {
     }
 }
 
+/// This controls how the service SID is added to the service process token.
+/// https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_sid_info
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum ServiceSidType {
+    None = 0,
+    Restricted = 3,
+    Unrestricted = 1,
+}
+
 /// A struct that represents a system service.
 ///
 /// The instances of the [`Service`] can be obtained via [`ServiceManager`].
@@ -1447,6 +1457,19 @@ impl Service {
         };
 
         Ok(result)
+    }
+
+    pub fn set_config_service_sid_info(&self, mut service_sid_type: ServiceSidType) -> crate::Result<()> {
+        // The structure we need to pass in is `SERVICE_SID_INFO`.
+        // It has a single member that specifies the new SID type, and as such,
+        // we can get away with not explicitly creating a structure in Rust.
+        unsafe {
+            self.change_config2(
+                winsvc::SERVICE_CONFIG_SERVICE_SID_INFO,
+                &mut service_sid_type,
+            )
+            .map_err(Error::Winapi)
+        }
     }
 
     /// Query the configured failure actions for the service.
