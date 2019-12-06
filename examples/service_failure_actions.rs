@@ -40,7 +40,7 @@ fn main() -> windows_service::Result<()> {
 
     println!("Create or open the service {}", SERVICE_NAME);
     let service = service_manager
-        .create_service(service_info, service_access)
+        .create_service(&service_info, service_access)
         .or(service_manager.open_service(SERVICE_NAME, service_access))?;
 
     let actions = vec![
