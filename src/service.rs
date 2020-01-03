@@ -1329,6 +1329,30 @@ impl Service {
         self.send_control_command(ServiceControl::Stop)
     }
 
+    /// Pause the service.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service::ServiceAccess;
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::PAUSE_CONTINUE)?;
+    /// my_service.pause()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn pause(&self) -> crate::Result<ServiceStatus> {
+        self.send_control_command(ServiceControl::Pause)
+    }
+
+    /// Resume the paused service.
+    pub fn resume(&self) -> crate::Result<ServiceStatus> {
+        self.send_control_command(ServiceControl::Continue)
+    }
+
     /// Get the service status from the system.
     pub fn query_status(&self) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
@@ -1459,7 +1483,10 @@ impl Service {
         Ok(result)
     }
 
-    pub fn set_config_service_sid_info(&self, mut service_sid_type: ServiceSidType) -> crate::Result<()> {
+    pub fn set_config_service_sid_info(
+        &self,
+        mut service_sid_type: ServiceSidType,
+    ) -> crate::Result<()> {
         // The structure we need to pass in is `SERVICE_SID_INFO`.
         // It has a single member that specifies the new SID type, and as such,
         // we can get away with not explicitly creating a structure in Rust.

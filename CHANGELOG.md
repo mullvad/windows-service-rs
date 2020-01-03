@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `Service::update_failure_actions`, `Service::get_failure_actions`, 
   `Service::set_failure_actions_on_non_crash_failures`, 
   `Service::get_failure_actions_on_non_crash_failures`)
+- Add support to pause and continue services. (See: `Service::pause` and `Service::resume`)
 
 ### Changed
 - Bumped the MSRV to 1.34, because of err-derive upgrade which depend on quote, to use
