@@ -1281,14 +1281,19 @@ impl ServiceStatus {
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
     fn from_raw_ex(raw: winsvc::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
+        let current_state = ServiceState::from_raw(raw.dwCurrentState)?;
+        let pid = match current_state {
+            ServiceState::Running => Some(raw.dwProcessId),
+            _ => None,
+        };
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
-            current_state: ServiceState::from_raw(raw.dwCurrentState)?,
             controls_accepted: ServiceControlAccept::from_bits_truncate(raw.dwControlsAccepted),
             exit_code: ServiceExitCode::from(&raw),
             checkpoint: raw.dwCheckPoint,
             wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
-            pid: Some(raw.dwProcessId),
+            current_state,
+            pid,
         })
     }
 }
