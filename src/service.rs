@@ -1135,6 +1135,16 @@ impl<'a> From<&'a winsvc::SERVICE_STATUS> for ServiceExitCode {
     }
 }
 
+impl<'a> From<&'a winsvc::SERVICE_STATUS_PROCESS> for ServiceExitCode {
+    fn from(service_status: &'a winsvc::SERVICE_STATUS_PROCESS) -> Self {
+        if service_status.dwWin32ExitCode == ERROR_SERVICE_SPECIFIC_ERROR {
+            ServiceExitCode::ServiceSpecific(service_status.dwServiceSpecificExitCode)
+        } else {
+            ServiceExitCode::Win32(service_status.dwWin32ExitCode)
+        }
+    }
+}
+
 bitflags::bitflags! {
     /// Flags describing accepted types of service control events.
     pub struct ServiceControlAccept: u32 {
@@ -1224,6 +1234,10 @@ pub struct ServiceStatus {
     /// Converting this to the FFI form will panic if the duration is too large to fit as
     /// milliseconds in a `DWORD`.
     pub wait_hint: Duration,
+
+    /// Process ID of the service
+    /// This is only retrieved when querying the service status.
+    pub pid: Option<u32>,
 }
 
 impl ServiceStatus {
@@ -1256,6 +1270,25 @@ impl ServiceStatus {
             exit_code: ServiceExitCode::from(&raw),
             checkpoint: raw.dwCheckPoint,
             wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
+            pid: None,
+        })
+    }
+
+
+    /// Tries to parse a `SERVICE_STATUS_PROCESS` into a Rust [`ServiceStatus`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
+    fn from_raw_ex(raw: winsvc::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
+        Ok(ServiceStatus {
+            service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
+            current_state: ServiceState::from_raw(raw.dwCurrentState)?,
+            controls_accepted: ServiceControlAccept::from_bits_truncate(raw.dwControlsAccepted),
+            exit_code: ServiceExitCode::from(&raw),
+            checkpoint: raw.dwCheckPoint,
+            wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
+            pid: Some(raw.dwProcessId),
         })
     }
 }
@@ -1355,14 +1388,21 @@ impl Service {
 
     /// Get the service status from the system.
     pub fn query_status(&self) -> crate::Result<ServiceStatus> {
-        let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
+        let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS_PROCESS>() };
+        let mut bytes_needed: DWORD = 0;
         let success = unsafe {
-            winsvc::QueryServiceStatus(self.service_handle.raw_handle(), &mut raw_status)
+            winsvc::QueryServiceStatusEx(
+                self.service_handle.raw_handle(),
+                winsvc::SC_STATUS_PROCESS_INFO,
+                &mut raw_status as *mut _ as _,
+                std::mem::size_of::<winsvc::SERVICE_STATUS_PROCESS>() as u32,
+                &mut bytes_needed,
+            )
         };
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
+            ServiceStatus::from_raw_ex(raw_status).map_err(Error::InvalidServiceState)
         }
     }
 
