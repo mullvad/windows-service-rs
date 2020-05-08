@@ -153,7 +153,7 @@
 //!         // Only used for pending states, otherwise must be zero
 //!         wait_hint: Duration::default(),
 //!         // Unused for setting status
-//!         pid: None,
+//!         process_id: None,
 //!     };
 //!
 //!     // Tell the system that the service is running now

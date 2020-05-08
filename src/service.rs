@@ -1237,7 +1237,7 @@ pub struct ServiceStatus {
 
     /// Process ID of the service
     /// This is only retrieved when querying the service status.
-    pub pid: Option<u32>,
+    pub process_id: Option<u32>,
 }
 
 impl ServiceStatus {
@@ -1270,7 +1270,7 @@ impl ServiceStatus {
             exit_code: ServiceExitCode::from(&raw),
             checkpoint: raw.dwCheckPoint,
             wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
-            pid: None,
+            process_id: None,
         })
     }
 
@@ -1282,7 +1282,7 @@ impl ServiceStatus {
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
     fn from_raw_ex(raw: winsvc::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
         let current_state = ServiceState::from_raw(raw.dwCurrentState)?;
-        let pid = match current_state {
+        let process_id = match current_state {
             ServiceState::Running => Some(raw.dwProcessId),
             _ => None,
         };
@@ -1293,7 +1293,7 @@ impl ServiceStatus {
             checkpoint: raw.dwCheckPoint,
             wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
             current_state,
-            pid,
+            process_id,
         })
     }
 }

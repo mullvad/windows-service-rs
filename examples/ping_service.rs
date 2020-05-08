@@ -101,7 +101,7 @@ mod ping_service {
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: Duration::default(),
-            pid: None,
+            process_id: None,
         })?;
 
         // For demo purposes this service sends a UDP packet once a second.
@@ -132,7 +132,7 @@ mod ping_service {
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: Duration::default(),
-            pid: None,
+            process_id: None,
         })?;
 
         Ok(())
