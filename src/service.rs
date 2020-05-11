@@ -1288,11 +1288,11 @@ impl ServiceStatus {
         };
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
+            current_state,
             controls_accepted: ServiceControlAccept::from_bits_truncate(raw.dwControlsAccepted),
             exit_code: ServiceExitCode::from(&raw),
             checkpoint: raw.dwCheckPoint,
             wait_hint: Duration::from_millis(raw.dwWaitHint as u64),
-            current_state,
             process_id,
         })
     }
