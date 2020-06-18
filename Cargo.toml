@@ -1,13 +1,13 @@
 [package]
 name = "windows-service"
-version = "0.2.0"
+version = "0.3.0"
 description = "A crate that provides facilities for management and implementation of windows services"
 readme = "README.md"
-authors = ["Mullvad VPN <admin@mullvad.net>", "Andrej Mihajlov <and@mullvad.net>", "Linus Färnstrand <linus@mullvad.net>"]
+authors = ["Mullvad VPN"]
 keywords = ["windows", "service", "daemon"]
-categories = ["api-bindings"]
+categories = ["api-bindings", "os::windows-apis"]
 repository = "https://github.com/mullvad/windows-service-rs"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [package.metadata.docs.rs]
