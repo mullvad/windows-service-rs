@@ -262,4 +262,3 @@ pub mod service_dispatcher;
 
 mod double_nul_terminated;
 mod shell_escape;
-mod winsvc_vendored;
