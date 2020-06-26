@@ -6,7 +6,7 @@ use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
 use std::time::Duration;
-use std::{io, mem};
+use std::{fmt, io, mem};
 
 use widestring::{NulError, WideCStr, WideCString, WideString};
 use winapi::shared::guiddef::{IsEqualGUID, GUID};
@@ -1710,14 +1710,26 @@ fn to_wide_slice(
     }
 }
 
-#[derive(err_derive::Error, Debug)]
+#[derive(Debug)]
 pub enum ParseRawError {
-    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    /// Invalid integer value for the target type.
     InvalidInteger(u32),
 
-    #[error(display = "Invalid GUID value for the target type: {}", _0)]
+    /// Invalid GUID value for the target type.
     InvalidGuid(String),
 }
+
+impl fmt::Display for ParseRawError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ParseRawError::*;
+        match self {
+            InvalidInteger(i) => write!(f, "Invalid integer value for the target type: {}", i),
+            InvalidGuid(v) => write!(f, "Invalid GUID value for the target type: {}", v),
+        }
+    }
+}
+
+impl std::error::Error for ParseRawError {}
 
 fn string_from_guid(guid: &GUID) -> String {
     format!(
