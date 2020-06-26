@@ -16,5 +16,5 @@ default-target = "x86_64-pc-windows-msvc"
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.2"
 err-derive = "0.2.4"
-winapi = { version = "0.3.8", features = ["dbt", "std", "winbase", "winerror", "winsvc"] }
+winapi = { version = "0.3.9", features = ["dbt", "std", "winbase", "winerror", "winsvc"] }
 widestring = "0.4.0"

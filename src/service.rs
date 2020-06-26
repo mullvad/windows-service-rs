@@ -13,11 +13,10 @@ use winapi::shared::guiddef::{IsEqualGUID, GUID};
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use winapi::um::winbase::INFINITE;
-use winapi::um::{dbt, winnt, winuser};
+use winapi::um::{dbt, winnt, winsvc, winuser};
 
 use crate::sc_handle::ScHandle;
 use crate::shell_escape;
-use crate::winsvc_vendored as winsvc;
 use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
