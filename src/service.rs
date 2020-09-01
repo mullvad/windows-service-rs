@@ -1392,14 +1392,13 @@ impl Service {
 
     /// Get the service status from the system.
     pub fn query_status(&self) -> crate::Result<ServiceStatus> {
-        let mut raw_status =
-            unsafe { mem::MaybeUninit::<winsvc::SERVICE_STATUS_PROCESS>::zeroed().assume_init() };
+        let mut raw_status = mem::MaybeUninit::<winsvc::SERVICE_STATUS_PROCESS>::zeroed();
         let mut bytes_needed: DWORD = 0;
         let success = unsafe {
             winsvc::QueryServiceStatusEx(
                 self.service_handle.raw_handle(),
                 winsvc::SC_STATUS_PROCESS_INFO,
-                &mut raw_status as *mut _ as _,
+                raw_status.as_mut_ptr() as _,
                 std::mem::size_of::<winsvc::SERVICE_STATUS_PROCESS>() as u32,
                 &mut bytes_needed,
             )
@@ -1407,7 +1406,8 @@ impl Service {
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw_ex(raw_status).map_err(Error::InvalidServiceState)
+            let status = unsafe { raw_status.assume_init() };
+            ServiceStatus::from_raw_ex(status).map_err(Error::InvalidServiceState)
         }
     }
 
@@ -1428,6 +1428,7 @@ impl Service {
             mem::MaybeUninit::<[mem::MaybeUninit<u8>; MAX_QUERY_BUFFER_SIZE]>::uninit()
                 .assume_init()
         };
+
         let mut bytes_written: u32 = 0;
 
         let success = unsafe {
@@ -1443,6 +1444,7 @@ impl Service {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             unsafe {
+                // Safety: buf has been initialized
                 let raw_config =
                     std::mem::transmute::<_, *const winsvc::QUERY_SERVICE_CONFIGW>(buf.as_ptr());
                 ServiceConfig::from_raw(*raw_config)
@@ -1517,10 +1519,13 @@ impl Service {
     /// Query the system for the boolean indication that the service is configured to run failure
     /// actions on non-crash failures.
     pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
-        let mut data = [0u8; MAX_QUERY_BUFFER_SIZE];
+        let mut buf = unsafe {
+            mem::MaybeUninit::<[mem::MaybeUninit<u8>; MAX_QUERY_BUFFER_SIZE]>::uninit()
+                .assume_init()
+        };
 
         let raw_failure_actions_flag: winsvc::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
-            self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
+            self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut buf)
                 .map_err(Error::Winapi)?
         };
 
@@ -1552,10 +1557,12 @@ impl Service {
     /// Query the configured failure actions for the service.
     pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
         unsafe {
-            let mut data = [0u8; MAX_QUERY_BUFFER_SIZE];
+            let mut buf =
+                mem::MaybeUninit::<[mem::MaybeUninit<u8>; MAX_QUERY_BUFFER_SIZE]>::uninit()
+                    .assume_init();
 
             let raw_failure_actions: winsvc::SERVICE_FAILURE_ACTIONSW = self
-                .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
+                .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut buf)
                 .map_err(Error::Winapi)?;
 
             ServiceFailureActions::from_raw(raw_failure_actions)
@@ -1646,20 +1653,21 @@ impl Service {
 
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
-        let mut raw_status =
-            unsafe { mem::MaybeUninit::<winsvc::SERVICE_STATUS>::zeroed().assume_init() };
+        let mut raw_status = mem::MaybeUninit::<winsvc::SERVICE_STATUS>::zeroed();
         let success = unsafe {
             winsvc::ControlService(
                 self.service_handle.raw_handle(),
                 command.raw_service_control_type(),
-                &mut raw_status,
+                raw_status.as_mut_ptr(),
             )
         };
 
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
+            // Safety: raw_status has been initialized
+            let status = unsafe { raw_status.assume_init() };
+            ServiceStatus::from_raw(status).map_err(Error::InvalidServiceState)
         }
     }
 
@@ -1667,7 +1675,7 @@ impl Service {
     unsafe fn query_config2<T: Copy>(
         &self,
         kind: DWORD,
-        data: &mut [u8; MAX_QUERY_BUFFER_SIZE],
+        data: &mut [mem::MaybeUninit<u8>],
     ) -> io::Result<T> {
         let mut bytes_written: u32 = 0;
 
