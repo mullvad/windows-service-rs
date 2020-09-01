@@ -11,10 +11,15 @@ fn main() -> windows_service::Result<()> {
     let manager_access = ServiceManagerAccess::CONNECT;
     let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
-    let service = service_manager.open_service(service_name, ServiceAccess::QUERY_CONFIG)?;
+    let service = service_manager.open_service(
+        service_name,
+        ServiceAccess::QUERY_CONFIG | ServiceAccess::QUERY_STATUS,
+    )?;
 
     let config = service.query_config()?;
+    let status = service.query_status()?;
     println!("{:#?}", config);
+    println!("{:#?}", status);
     Ok(())
 }
 
