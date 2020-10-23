@@ -151,7 +151,7 @@ impl ServiceDependency {
         }
     }
 
-    pub fn from_system_identifier<S: AsRef<OsStr>>(identifier: S) -> Self {
+    pub fn from_system_identifier(identifier: impl AsRef<OsStr>) -> Self {
         let group_prefix: u16 = '+' as u16;
         let mut iter = identifier.as_ref().encode_wide().peekable();
 

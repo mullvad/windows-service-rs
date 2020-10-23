@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fix segmentation fault in `Service` functions, that query service config, by moving buffer 
   allocation on heap.
 
+### Changed
+- Breaking: `ServiceDependency::from_system_identifier()`, `ServiceManager::new()`, 
+  `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
+  `impl AsRef<OsStr>` arguments.
+
 
 ## [0.3.0] - 2020-06-18
 ### Added
