@@ -28,7 +28,8 @@ fn main() -> windows_service::Result<()> {
         account_name: None, // run as System
         account_password: None,
     };
-    let _service = service_manager.create_service(&service_info, ServiceAccess::empty())?;
+    let service = service_manager.create_service(&service_info, ServiceAccess::CHANGE_CONFIG)?;
+    service.set_description("Windows service example from windows-service-rs")?;
     Ok(())
 }
 
