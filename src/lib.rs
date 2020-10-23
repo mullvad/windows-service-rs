@@ -173,9 +173,6 @@
 //! [`ServiceStatus::checkpoint`]: service::ServiceStatus::checkpoint
 //! [`StartPending`]: service::ServiceState::StartPending
 //! [`Running`]: service::ServiceState::Running
-//! [`ServiceActionType`]: service::ServiceActionType
-//! [`ServiceErrorControl`]: service::ServiceErrorControl
-//! [`ServiceState`]: service::ServiceState
 
 #![cfg(windows)]
 
@@ -224,19 +221,19 @@ pub enum Error {
     #[error(display = "Invalid start argument")]
     InvalidStartArgument(#[error(source)] widestring::NulError<u16>),
 
-    /// Invalid raw representation of [`ServiceState`].
+    /// Invalid raw representation of [`ServiceState`](service::ServiceState).
     #[error(display = "Invalid service state value")]
     InvalidServiceState(#[error(source)] service::ParseRawError),
 
-    /// Invalid raw representation of [`ServiceStartType`].
+    /// Invalid raw representation of [`ServiceStartType`](service::ServiceStartType).
     #[error(display = "Invalid service start value")]
     InvalidServiceStartType(#[error(source)] service::ParseRawError),
 
-    /// Invalid raw representation of [`ServiceErrorControl`].
+    /// Invalid raw representation of [`ServiceErrorControl`](service::ServiceErrorControl).
     #[error(display = "Invalid service error control value")]
     InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
 
-    /// Invalid raw representation of [`ServiceActionType`]
+    /// Invalid raw representation of [`ServiceActionType`](service::ServiceActionType).
     #[error(display = "Invalid service action type")]
     InvalidServiceActionType(#[error(source)] service::ParseRawError),
 
