@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Breaking: `ServiceDependency::from_system_identifier()`, `ServiceManager::new()`, 
+  `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
+  `impl AsRef<OsStr>` arguments.
 
 
 ## [0.3.1] - 2020-10-27
