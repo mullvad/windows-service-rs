@@ -1715,7 +1715,7 @@ fn to_wide_slice(
 ) -> ::std::result::Result<Option<Vec<u16>>, NulError<u16>> {
     if let Some(s) = s {
         Ok(Some(
-            WideCString::from_os_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
+            WideCString::from_os_str(s).map(|s| s.into_vec_with_nul())?,
         ))
     } else {
         Ok(None)
