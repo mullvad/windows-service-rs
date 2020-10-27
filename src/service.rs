@@ -1638,6 +1638,22 @@ impl Service {
         }
     }
 
+    /// Set service description.
+    ///
+    /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
+    pub fn set_description(&self, description: impl AsRef<OsStr>) -> crate::Result<()> {
+        let wide_str =
+            WideCString::from_os_str(description).map_err(Error::InvalidServiceDescription)?;
+        let mut service_description = winsvc::SERVICE_DESCRIPTIONW {
+            lpDescription: wide_str.as_ptr() as *mut _,
+        };
+
+        unsafe {
+            self.change_config2(winsvc::SERVICE_CONFIG_DESCRIPTION, &mut service_description)
+                .map_err(Error::Winapi)
+        }
+    }
+
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
@@ -1699,7 +1715,7 @@ fn to_wide_slice(
 ) -> ::std::result::Result<Option<Vec<u16>>, NulError<u16>> {
     if let Some(s) = s {
         Ok(Some(
-            WideCString::from_os_str(s).map(|s| s.as_slice_with_nul().to_vec())?,
+            WideCString::from_os_str(s).map(|s| s.into_vec_with_nul())?,
         ))
     } else {
         Ok(None)
