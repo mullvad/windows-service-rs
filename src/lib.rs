@@ -179,78 +179,112 @@
 
 #![cfg(windows)]
 
+use std::fmt;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(err_derive::Error, Debug)]
-#[error(no_from)]
+#[derive(Debug)]
 pub enum Error {
     /// Invalid account name.
-    #[error(display = "Invalid account name")]
-    InvalidAccountName(#[error(source)] widestring::NulError<u16>),
+    InvalidAccountName(widestring::NulError<u16>),
 
     /// Invalid account password.
-    #[error(display = "Invalid account password")]
-    InvalidAccountPassword(#[error(source)] widestring::NulError<u16>),
+    InvalidAccountPassword(widestring::NulError<u16>),
 
     /// Invalid display name.
-    #[error(display = "Invalid display name")]
-    InvalidDisplayName(#[error(source)] widestring::NulError<u16>),
+    InvalidDisplayName(widestring::NulError<u16>),
 
     /// Invalid database name.
-    #[error(display = "Invalid database name")]
-    InvalidDatabaseName(#[error(source)] widestring::NulError<u16>),
+    InvalidDatabaseName(widestring::NulError<u16>),
 
     /// Invalid executable path.
-    #[error(display = "Invalid executable path")]
-    InvalidExecutablePath(#[error(source)] widestring::NulError<u16>),
+    InvalidExecutablePath(widestring::NulError<u16>),
 
     /// Invalid launch arguments.
-    #[error(display = "Invalid launch argument at index {}", _0)]
-    InvalidLaunchArgument(usize, #[error(source)] widestring::NulError<u16>),
+    InvalidLaunchArgument(usize, widestring::NulError<u16>),
 
     /// Invalid dependency name.
-    #[error(display = "Invalid dependency name")]
-    InvalidDependency(#[error(source)] widestring::NulError<u16>),
+    InvalidDependency(widestring::NulError<u16>),
 
     /// Invalid machine name.
-    #[error(display = "Invalid machine name")]
-    InvalidMachineName(#[error(source)] widestring::NulError<u16>),
+    InvalidMachineName(widestring::NulError<u16>),
 
     /// Invalid service name.
-    #[error(display = "Invalid service name")]
-    InvalidServiceName(#[error(source)] widestring::NulError<u16>),
+    InvalidServiceName(widestring::NulError<u16>),
 
     /// Invalid start argument.
-    #[error(display = "Invalid start argument")]
-    InvalidStartArgument(#[error(source)] widestring::NulError<u16>),
+    InvalidStartArgument(widestring::NulError<u16>),
 
     /// Invalid raw representation of [`ServiceState`].
-    #[error(display = "Invalid service state value")]
-    InvalidServiceState(#[error(source)] service::ParseRawError),
+    InvalidServiceState(service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceStartType`].
-    #[error(display = "Invalid service start value")]
-    InvalidServiceStartType(#[error(source)] service::ParseRawError),
+    InvalidServiceStartType(service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceErrorControl`].
-    #[error(display = "Invalid service error control value")]
-    InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
+    InvalidServiceErrorControl(service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceActionType`]
-    #[error(display = "Invalid service action type")]
-    InvalidServiceActionType(#[error(source)] service::ParseRawError),
+    InvalidServiceActionType(service::ParseRawError),
 
     /// Invalid reboot message
-    #[error(display = "Invalid service action failures reboot message")]
-    InvalidServiceActionFailuresRebootMessage(#[error(source)] widestring::NulError<u16>),
+    InvalidServiceActionFailuresRebootMessage(widestring::NulError<u16>),
 
     /// Invalid command
-    #[error(display = "Invalid service action failures command")]
-    InvalidServiceActionFailuresCommand(#[error(source)] widestring::NulError<u16>),
+    InvalidServiceActionFailuresCommand(widestring::NulError<u16>),
 
     /// IO error when calling winapi
-    #[error(display = "IO error in winapi call")]
-    Winapi(#[error(source)] std::io::Error),
+    Winapi(std::io::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+        match self {
+            InvalidAccountName(_) => write!(f, "Invalid account name"),
+            InvalidAccountPassword(_) => write!(f, "Invalid account password"),
+            InvalidDisplayName(_) => write!(f, "Invalid display name"),
+            InvalidDatabaseName(_) => write!(f, "Invalid database name"),
+            InvalidExecutablePath(_) => write!(f, "Invalid executable path"),
+            InvalidLaunchArgument(index, _) => write!(f, "Invalid launch argument at index {}", index),
+            InvalidDependency(_) => write!(f, "Invalid dependency name"),
+            InvalidMachineName(_) => write!(f, "Invalid machine name"),
+            InvalidServiceName(_) => write!(f, "Invalid service name"),
+            InvalidStartArgument(_) => write!(f, "Invalid start argument"),
+            InvalidServiceState(_) => write!(f, "Invalid service state value"),
+            InvalidServiceStartType(_) => write!(f, "Invalid service start value"),
+            InvalidServiceErrorControl(_) => write!(f, "Invalid service error control value"),
+            InvalidServiceActionType(_) => write!(f, "Invalid service action type"),
+            InvalidServiceActionFailuresRebootMessage(_) => write!(f, "Invalid service action failures reboot message"),
+            InvalidServiceActionFailuresCommand(_) => write!(f, "Invalid service action failures command"),
+            Winapi(_) => write!(f, "IO error in winapi call"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use Error::*;
+        match self {
+            InvalidAccountName(err) => Some(err),
+            InvalidAccountPassword(err) => Some(err),
+            InvalidDisplayName(err) => Some(err),
+            InvalidDatabaseName(err) => Some(err),
+            InvalidExecutablePath(err) => Some(err),
+            InvalidLaunchArgument(_, err) => Some(err),
+            InvalidDependency(err) => Some(err),
+            InvalidMachineName(err) => Some(err),
+            InvalidServiceName(err) => Some(err),
+            InvalidStartArgument(err) => Some(err),
+            InvalidServiceState(err) => Some(err),
+            InvalidServiceStartType(err) => Some(err),
+            InvalidServiceErrorControl(err) => Some(err),
+            InvalidServiceActionType(err) => Some(err),
+            InvalidServiceActionFailuresRebootMessage(err) => Some(err),
+            InvalidServiceActionFailuresCommand(err) => Some(err),
+            Winapi(err) => Some(err),
+        }
+    }
 }
 
 mod sc_handle;
