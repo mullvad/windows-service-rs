@@ -35,9 +35,9 @@ impl ServiceManager {
     /// * `machine` - The name of machine. Pass `None` to connect to local machine.
     /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
-    fn new<M: AsRef<OsStr>, D: AsRef<OsStr>>(
-        machine: Option<M>,
-        database: Option<D>,
+    fn new(
+        machine: Option<impl AsRef<OsStr>>,
+        database: Option<impl AsRef<OsStr>>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
         let machine_name = to_wide(machine).map_err(Error::InvalidMachineName)?;
@@ -66,8 +66,8 @@ impl ServiceManager {
     /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
     /// * `request_access` - Desired access permissions.
-    pub fn local_computer<D: AsRef<OsStr>>(
-        database: Option<D>,
+    pub fn local_computer(
+        database: Option<impl AsRef<OsStr>>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
         ServiceManager::new(None::<&OsStr>, database, request_access)
@@ -81,9 +81,9 @@ impl ServiceManager {
     /// * `database` - The name of database to connect to. Pass `None` to connect to active
     ///   database.
     /// * `request_access` - desired access permissions.
-    pub fn remote_computer<M: AsRef<OsStr>, D: AsRef<OsStr>>(
-        machine: M,
-        database: Option<D>,
+    pub fn remote_computer(
+        machine: impl AsRef<OsStr>,
+        database: Option<impl AsRef<OsStr>>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
         ServiceManager::new(Some(machine), database, request_access)
