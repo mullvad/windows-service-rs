@@ -5,12 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+
+## [0.3.1] - 2020-10-27
 ### Added
 - Add support for service description. (See: `Service::set_description`)
 
 ### Fixed
-- Fix segmentation fault in `Service` functions, that query service config, by moving buffer 
-  allocation on heap.
+- Fix segmentation fault in `Service` functions, that query service config, by moving buffer
+  allocation to heap.
 
 
 ## [0.3.0] - 2020-06-18
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Bumped the MSRV to 1.34, because of err-derive upgrade which depend on quote, to use
   `Duration::as_millis()` and the `TryFrom` trait.
 - Breaking: `ServiceManager::create_service()` now expects a borrowed `ServiceInfo` argument.
+
 
 ## [0.2.0] - 2019-04-01
 ### Added
