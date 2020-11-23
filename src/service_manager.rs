@@ -19,6 +19,9 @@ bitflags::bitflags! {
 
         /// Can enumerate services or receive notifications.
         const ENUMERATE_SERVICE = winsvc::SC_MANAGER_ENUMERATE_SERVICE;
+
+        /// All access. Used for stopping or deleting services.
+        const ALL_ACCESS = winsvc::SC_MANAGER_ALL_ACCESS;
     }
 }
 
