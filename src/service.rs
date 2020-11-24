@@ -407,19 +407,29 @@ impl RawServiceInfo {
         let account_password = to_wide(service_info.account_password.as_ref())
             .map_err(Error::InvalidAccountPassword)?;
 
-        // escape executable path and arguments and combine them into single command
-        let executable_path =
-            escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
-
+        // escape executable path and arguments and combine them into a single command
         let mut launch_command_buffer = WideString::new();
-        launch_command_buffer.push(executable_path);
+        if service_info.service_type.intersects(ServiceType::KERNEL_DRIVER | ServiceType::FILE_SYSTEM_DRIVER) {
+            // drivers do not support launch arguments
+            if !service_info.launch_arguments.is_empty() {
+                return Err(Error::LaunchArgumentsNotSupported);
+            }
 
-        for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
-            let wide =
-                escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
+            // also the path must not be quoted even if it contains spaces
+            let executable_path = WideCString::from_os_str(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+            launch_command_buffer.push(executable_path.to_ustring());
 
-            launch_command_buffer.push_str(" ");
-            launch_command_buffer.push(wide);
+        } else {
+            let executable_path = escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+            launch_command_buffer.push(executable_path);
+
+            for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
+                let wide =
+                    escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
+
+                launch_command_buffer.push_str(" ");
+                launch_command_buffer.push(wide);
+            }
         }
 
         // Safety: We are sure launch_command_buffer does not contain nulls
