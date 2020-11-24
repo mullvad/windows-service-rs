@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
   `impl AsRef<OsStr>` arguments.
 
+### Fixed
+- Don't escape binary path for kernel drivers as they don't support that.
+
 
 ## [0.3.1] - 2020-10-27
 ### Added
