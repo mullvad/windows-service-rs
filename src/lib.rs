@@ -205,7 +205,7 @@ pub enum Error {
     #[error(display = "Invalid launch argument at index {}", _0)]
     InvalidLaunchArgument(usize, #[error(source)] widestring::NulError<u16>),
 
-    /// Invalid launch arguments.
+    /// Launch arguments are not supported for kernel drivers.
     #[error(display = "Kernel drivers do not support launch arguments")]
     LaunchArgumentsNotSupported,
 
