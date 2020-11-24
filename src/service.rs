@@ -409,18 +409,22 @@ impl RawServiceInfo {
 
         // escape executable path and arguments and combine them into a single command
         let mut launch_command_buffer = WideString::new();
-        if service_info.service_type.intersects(ServiceType::KERNEL_DRIVER | ServiceType::FILE_SYSTEM_DRIVER) {
+        if service_info
+            .service_type
+            .intersects(ServiceType::KERNEL_DRIVER | ServiceType::FILE_SYSTEM_DRIVER)
+        {
             // drivers do not support launch arguments
             if !service_info.launch_arguments.is_empty() {
                 return Err(Error::LaunchArgumentsNotSupported);
             }
 
             // also the path must not be quoted even if it contains spaces
-            let executable_path = WideCString::from_os_str(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+            let executable_path = WideCString::from_os_str(&service_info.executable_path)
+                .map_err(Error::InvalidExecutablePath)?;
             launch_command_buffer.push(executable_path.to_ustring());
-
         } else {
-            let executable_path = escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+            let executable_path =
+                escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
             launch_command_buffer.push(executable_path);
 
             for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
