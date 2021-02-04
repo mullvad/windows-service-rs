@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Breaking: `ServiceDependency::from_system_identifier()`, `ServiceManager::new()`, 
   `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
   `impl AsRef<OsStr>` arguments.
+- Upgrade err-derive dependency to 0.3.0
 
 ### Fixed
 - Don't escape binary path for kernel drivers as they don't support that.
