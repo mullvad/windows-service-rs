@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
   `impl AsRef<OsStr>` arguments.
 - Upgrade err-derive dependency to 0.3.0
+- `ServiceStatusHandle` is now Sync.
 
 ### Fixed
 - Don't escape binary path for kernel drivers as they don't support that.
