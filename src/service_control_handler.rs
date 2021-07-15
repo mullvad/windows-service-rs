@@ -33,6 +33,7 @@ impl ServiceStatusHandle {
 // See remarks section for more info:
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ms686241(v=vs.85).aspx
 unsafe impl Send for ServiceStatusHandle {}
+unsafe impl Sync for ServiceStatusHandle {}
 
 /// Abstraction over the return value of service control handler.
 /// The meaning of each of variants in this enum depends on the type of received event.
