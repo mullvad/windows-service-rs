@@ -461,7 +461,6 @@ impl RawServiceInfo {
     }
 }
 
-
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceConfig {
@@ -1287,7 +1286,6 @@ impl ServiceStatus {
             process_id: None,
         })
     }
-
 
     /// Tries to parse a `SERVICE_STATUS_PROCESS` into a Rust [`ServiceStatus`].
     ///

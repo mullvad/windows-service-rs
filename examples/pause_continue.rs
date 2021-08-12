@@ -31,7 +31,6 @@ fn main() -> windows_service::Result<()> {
     let resumed_state = service.resume()?;
     println!("{:?}", resumed_state.current_state);
 
-
     Ok(())
 }
 
