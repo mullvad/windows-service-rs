@@ -85,7 +85,7 @@ pub enum Error {
 /// Indicates a invalid nul value was found when converting a string to a wide string.
 /// This error contains the position of the nul value, as well as the faulty string.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NulError(usize, Vec<u16>);
+pub struct NulError(usize, Option<Vec<u16>>);
 
 impl NulError {
     /// Returns the position of the nul value in the slice that was provided to `U16CString`.
@@ -95,7 +95,7 @@ impl NulError {
 
     /// Consumes this error, returning the underlying vector of u16 values which generated the error
     /// in the first place.
-    pub fn into_vec(self) -> Vec<u16> {
+    pub fn into_vec(self) -> Option<Vec<u16>> {
         self.1
     }
 }
@@ -112,8 +112,8 @@ impl std::error::Error for NulError {
     }
 }
 
-impl From<widestring::NulError<u16>> for NulError {
-    fn from(s: widestring::NulError<u16>) -> NulError {
+impl From<widestring::error::ContainsNul<u16>> for NulError {
+    fn from(s: widestring::error::ContainsNul<u16>) -> NulError {
         NulError(s.nul_position(), s.into_vec())
     }
 }
