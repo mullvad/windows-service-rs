@@ -176,87 +176,8 @@
 
 #![cfg(windows)]
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(err_derive::Error, Debug)]
-#[error(no_from)]
-pub enum Error {
-    /// Invalid account name.
-    #[error(display = "Invalid account name")]
-    InvalidAccountName(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid account password.
-    #[error(display = "Invalid account password")]
-    InvalidAccountPassword(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid display name.
-    #[error(display = "Invalid display name")]
-    InvalidDisplayName(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid database name.
-    #[error(display = "Invalid database name")]
-    InvalidDatabaseName(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid executable path.
-    #[error(display = "Invalid executable path")]
-    InvalidExecutablePath(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid launch arguments.
-    #[error(display = "Invalid launch argument at index {}", _0)]
-    InvalidLaunchArgument(usize, #[error(source)] widestring::NulError<u16>),
-
-    /// Launch arguments are not supported for kernel drivers.
-    #[error(display = "Kernel drivers do not support launch arguments")]
-    LaunchArgumentsNotSupported,
-
-    /// Invalid dependency name.
-    #[error(display = "Invalid dependency name")]
-    InvalidDependency(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid machine name.
-    #[error(display = "Invalid machine name")]
-    InvalidMachineName(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid service name.
-    #[error(display = "Invalid service name")]
-    InvalidServiceName(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid start argument.
-    #[error(display = "Invalid start argument")]
-    InvalidStartArgument(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid raw representation of [`ServiceState`](service::ServiceState).
-    #[error(display = "Invalid service state value")]
-    InvalidServiceState(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceStartType`](service::ServiceStartType).
-    #[error(display = "Invalid service start value")]
-    InvalidServiceStartType(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceErrorControl`](service::ServiceErrorControl).
-    #[error(display = "Invalid service error control value")]
-    InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceActionType`](service::ServiceActionType).
-    #[error(display = "Invalid service action type")]
-    InvalidServiceActionType(#[error(source)] service::ParseRawError),
-
-    /// Invalid reboot message
-    #[error(display = "Invalid service action failures reboot message")]
-    InvalidServiceActionFailuresRebootMessage(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid command
-    #[error(display = "Invalid service action failures command")]
-    InvalidServiceActionFailuresCommand(#[error(source)] widestring::NulError<u16>),
-
-    /// Invalid service description
-    #[error(display = "Invalid service description")]
-    InvalidServiceDescription(#[error(source)] widestring::NulError<u16>),
-
-    /// IO error when calling winapi
-    #[error(display = "IO error in winapi call")]
-    Winapi(#[error(source)] std::io::Error),
-}
+mod error;
+pub use error::*;
 
 mod sc_handle;
 pub mod service;
