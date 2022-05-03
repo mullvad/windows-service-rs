@@ -40,8 +40,8 @@ impl ServiceManager {
         database: Option<impl AsRef<OsStr>>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
-        let machine_name = to_wide(machine).map_err(Error::InvalidMachineName)?;
-        let database_name = to_wide(database).map_err(Error::InvalidDatabaseName)?;
+        let machine_name = to_wide(machine).map_err(|_| Error::MachineNameHasNulByte)?;
+        let database_name = to_wide(database).map_err(|_| Error::DatabaseNameHasNulByte)?;
         let handle = unsafe {
             winsvc::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
@@ -192,7 +192,8 @@ impl ServiceManager {
         name: impl AsRef<OsStr>,
         request_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name = WideCString::from_os_str(name).map_err(Error::InvalidServiceName)?;
+        let service_name =
+            WideCString::from_os_str(name).map_err(|_| Error::ServiceNameHasNulByte)?;
         let service_handle = unsafe {
             winsvc::OpenServiceW(
                 self.manager_handle.raw_handle(),

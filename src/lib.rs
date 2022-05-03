@@ -181,49 +181,49 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(err_derive::Error, Debug)]
 #[error(no_from)]
 pub enum Error {
-    /// Invalid account name.
-    #[error(display = "Invalid account name")]
-    InvalidAccountName(#[error(source)] widestring::NulError<u16>),
+    /// Account name contains a nul byte.
+    #[error(display = "Account name contains a nul byte")]
+    AccountNameHasNulByte,
 
-    /// Invalid account password.
-    #[error(display = "Invalid account password")]
-    InvalidAccountPassword(#[error(source)] widestring::NulError<u16>),
+    /// Account password contains a nul byte.
+    #[error(display = "Account password contains a nul byte")]
+    AccountPasswordHasNulByte,
 
-    /// Invalid display name.
-    #[error(display = "Invalid display name")]
-    InvalidDisplayName(#[error(source)] widestring::NulError<u16>),
+    /// Display name contains a nul byte.
+    #[error(display = "Display name contains a nul byte")]
+    DisplayNameHasNulByte,
 
-    /// Invalid database name.
-    #[error(display = "Invalid database name")]
-    InvalidDatabaseName(#[error(source)] widestring::NulError<u16>),
+    /// Database name contains a nul byte.
+    #[error(display = "Database name contains a nul byte")]
+    DatabaseNameHasNulByte,
 
-    /// Invalid executable path.
-    #[error(display = "Invalid executable path")]
-    InvalidExecutablePath(#[error(source)] widestring::NulError<u16>),
+    /// Executable path contains a nul byte.
+    #[error(display = "Executable path contains a nul byte")]
+    ExecutablePathHasNulByte,
 
-    /// Invalid launch arguments.
-    #[error(display = "Invalid launch argument at index {}", _0)]
-    InvalidLaunchArgument(usize, #[error(source)] widestring::NulError<u16>),
+    /// Launch arguments contains a nul byte.
+    #[error(display = "Launch argument at index {} contains a nul byte", _0)]
+    LaunchArgumentHasNulByte(usize),
 
     /// Launch arguments are not supported for kernel drivers.
     #[error(display = "Kernel drivers do not support launch arguments")]
     LaunchArgumentsNotSupported,
 
-    /// Invalid dependency name.
-    #[error(display = "Invalid dependency name")]
-    InvalidDependency(#[error(source)] widestring::NulError<u16>),
+    /// Dependency name contains a nul byte.
+    #[error(display = "Dependency name contains a nul byte")]
+    DependencyHasNulByte,
 
-    /// Invalid machine name.
-    #[error(display = "Invalid machine name")]
-    InvalidMachineName(#[error(source)] widestring::NulError<u16>),
+    /// Machine name contains a nul byte.
+    #[error(display = "Machine name contains a nul byte")]
+    MachineNameHasNulByte,
 
-    /// Invalid service name.
-    #[error(display = "Invalid service name")]
-    InvalidServiceName(#[error(source)] widestring::NulError<u16>),
+    /// Service name contains a nul byte.
+    #[error(display = "Service name contains a nul byte")]
+    ServiceNameHasNulByte,
 
-    /// Invalid start argument.
-    #[error(display = "Invalid start argument")]
-    InvalidStartArgument(#[error(source)] widestring::NulError<u16>),
+    /// Start argument contains a nul byte.
+    #[error(display = "Start argument contains a nul byte")]
+    StartArgumentHasNulByte,
 
     /// Invalid raw representation of [`ServiceState`](service::ServiceState).
     #[error(display = "Invalid service state value")]
@@ -241,17 +241,17 @@ pub enum Error {
     #[error(display = "Invalid service action type")]
     InvalidServiceActionType(#[error(source)] service::ParseRawError),
 
-    /// Invalid reboot message
-    #[error(display = "Invalid service action failures reboot message")]
-    InvalidServiceActionFailuresRebootMessage(#[error(source)] widestring::NulError<u16>),
+    /// Reboot message contains a nul byte.
+    #[error(display = "Service action failures reboot message contains a nul byte")]
+    ServiceActionFailuresRebootMessageHasNulByte,
 
-    /// Invalid command
-    #[error(display = "Invalid service action failures command")]
-    InvalidServiceActionFailuresCommand(#[error(source)] widestring::NulError<u16>),
+    /// Command contains a nul byte.
+    #[error(display = "Service action failures command contains a nul byte")]
+    ServiceActionFailuresCommandHasNulByte,
 
-    /// Invalid service description
-    #[error(display = "Invalid service description")]
-    InvalidServiceDescription(#[error(source)] widestring::NulError<u16>),
+    /// Service description contains a nul byte.
+    #[error(display = "Service description contains a nul byte")]
+    ServiceDescriptionHasNulByte,
 
     /// IO error when calling winapi
     #[error(display = "IO error in winapi call")]

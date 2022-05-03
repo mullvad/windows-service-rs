@@ -398,14 +398,14 @@ pub(crate) struct RawServiceInfo {
 
 impl RawServiceInfo {
     pub fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
-        let service_name =
-            WideCString::from_os_str(&service_info.name).map_err(Error::InvalidServiceName)?;
+        let service_name = WideCString::from_os_str(&service_info.name)
+            .map_err(|_| Error::ServiceNameHasNulByte)?;
         let display_name = WideCString::from_os_str(&service_info.display_name)
-            .map_err(Error::InvalidDisplayName)?;
-        let account_name =
-            to_wide(service_info.account_name.as_ref()).map_err(Error::InvalidAccountName)?;
+            .map_err(|_| Error::DisplayNameHasNulByte)?;
+        let account_name = to_wide(service_info.account_name.as_ref())
+            .map_err(|_| Error::AccountNameHasNulByte)?;
         let account_password = to_wide(service_info.account_password.as_ref())
-            .map_err(Error::InvalidAccountPassword)?;
+            .map_err(|_| Error::AccountPasswordHasNulByte)?;
 
         // escape executable path and arguments and combine them into a single command
         let mut launch_command_buffer = WideString::new();
@@ -420,16 +420,16 @@ impl RawServiceInfo {
 
             // also the path must not be quoted even if it contains spaces
             let executable_path = WideCString::from_os_str(&service_info.executable_path)
-                .map_err(Error::InvalidExecutablePath)?;
+                .map_err(|_| Error::ExecutablePathHasNulByte)?;
             launch_command_buffer.push(executable_path.to_ustring());
         } else {
-            let executable_path =
-                escape_wide(&service_info.executable_path).map_err(Error::InvalidExecutablePath)?;
+            let executable_path = escape_wide(&service_info.executable_path)
+                .map_err(|_| Error::ExecutablePathHasNulByte)?;
             launch_command_buffer.push(executable_path);
 
             for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
                 let wide =
-                    escape_wide(launch_argument).map_err(|e| Error::InvalidLaunchArgument(i, e))?;
+                    escape_wide(launch_argument).map_err(|_| Error::LaunchArgumentHasNulByte(i))?;
 
                 launch_command_buffer.push_str(" ");
                 launch_command_buffer.push(wide);
@@ -445,7 +445,7 @@ impl RawServiceInfo {
             .map(|dependency| dependency.to_system_identifier())
             .collect();
         let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
-            .map_err(Error::InvalidDependency)?;
+            .map_err(|_| Error::DependencyHasNulByte)?;
 
         Ok(Self {
             name: service_name,
@@ -1353,7 +1353,7 @@ impl Service {
     pub fn start(&self, service_arguments: &[impl AsRef<OsStr>]) -> crate::Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
-            .map(|s| WideCString::from_os_str(s).map_err(Error::InvalidStartArgument))
+            .map(|s| WideCString::from_os_str(s).map_err(|_| Error::StartArgumentHasNulByte))
             .collect::<crate::Result<Vec<WideCString>>>()?;
 
         let mut raw_service_arguments: Vec<*const u16> =
@@ -1623,9 +1623,9 @@ impl Service {
         let mut raw_failure_actions = unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONSW>() };
 
         let mut reboot_msg = to_wide_slice(update.reboot_msg)
-            .map_err(Error::InvalidServiceActionFailuresRebootMessage)?;
-        let mut command =
-            to_wide_slice(update.command).map_err(Error::InvalidServiceActionFailuresCommand)?;
+            .map_err(|_| Error::ServiceActionFailuresRebootMessageHasNulByte)?;
+        let mut command = to_wide_slice(update.command)
+            .map_err(|_| Error::ServiceActionFailuresCommandHasNulByte)?;
         let mut sc_actions: Option<Vec<winsvc::SC_ACTION>> = update
             .actions
             .map(|actions| actions.iter().map(ServiceAction::to_raw).collect());
@@ -1654,8 +1654,8 @@ impl Service {
     ///
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
     pub fn set_description(&self, description: impl AsRef<OsStr>) -> crate::Result<()> {
-        let wide_str =
-            WideCString::from_os_str(description).map_err(Error::InvalidServiceDescription)?;
+        let wide_str = WideCString::from_os_str(description)
+            .map_err(|_| Error::ServiceDescriptionHasNulByte)?;
         let mut service_description = winsvc::SERVICE_DESCRIPTIONW {
             lpDescription: wide_str.as_ptr() as *mut _,
         };
