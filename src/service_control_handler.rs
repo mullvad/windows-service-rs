@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::io;
 use std::os::raw::c_void;
+use std::os::windows::prelude::{RawHandle, AsRawHandle};
 use widestring::WideCString;
 use windows_sys::Win32::{
     Foundation::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR},
@@ -30,6 +31,15 @@ impl ServiceStatusHandle {
         }
     }
 }
+
+impl AsRawHandle for ServiceStatusHandle {
+    /// Get access to the raw handle to use in other Windows APIs
+    fn as_raw_handle(&self) -> RawHandle {
+        self.0 as _
+    }
+}
+
+
 
 // Underlying SERVICE_STATUS_HANDLE is thread safe.
 // See remarks section for more info:
