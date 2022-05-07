@@ -1,6 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use widestring::{NulError, WideCStr, WideCString, WideString};
-use winapi::shared::ntdef::LPWSTR;
+use windows_sys::core::PWSTR;
 
 /// A helper to join a collection of `OsStr` into a nul-separated `WideString` ending with two nul
 /// wide characters.
@@ -35,7 +35,7 @@ pub fn from_vec(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, NulE
 ///
 /// Output:
 /// ["hello", "world"]
-pub unsafe fn parse_str_ptr(double_nul_terminated_string: LPWSTR) -> Vec<OsString> {
+pub unsafe fn parse_str_ptr(double_nul_terminated_string: PWSTR) -> Vec<OsString> {
     let mut results: Vec<OsString> = Vec::new();
 
     if !double_nul_terminated_string.is_null() {

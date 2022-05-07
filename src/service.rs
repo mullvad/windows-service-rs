@@ -9,11 +9,14 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{NulError, WideCStr, WideCString, WideString};
-use winapi::shared::guiddef::{IsEqualGUID, GUID};
-use winapi::shared::minwindef::DWORD;
-use winapi::shared::winerror::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
-use winapi::um::winbase::INFINITE;
-use winapi::um::{dbt, winnt, winsvc, winuser};
+use windows_sys::{
+    core::GUID,
+    Win32::{
+        Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
+        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
+        UI::WindowsAndMessaging,
+    },
+};
 
 use crate::sc_handle::ScHandle;
 use crate::shell_escape;
@@ -21,27 +24,27 @@ use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
-    pub struct ServiceType: DWORD {
+    pub struct ServiceType: u32 {
         /// File system driver service.
-        const FILE_SYSTEM_DRIVER = winnt::SERVICE_FILE_SYSTEM_DRIVER;
+        const FILE_SYSTEM_DRIVER = Services::SERVICE_FILE_SYSTEM_DRIVER;
 
         /// Driver service.
-        const KERNEL_DRIVER = winnt::SERVICE_KERNEL_DRIVER;
+        const KERNEL_DRIVER = Services::SERVICE_KERNEL_DRIVER;
 
         /// Service that runs in its own process.
-        const OWN_PROCESS = winnt::SERVICE_WIN32_OWN_PROCESS;
+        const OWN_PROCESS = Services::SERVICE_WIN32_OWN_PROCESS;
 
         /// Service that shares a process with one or more other services.
-        const SHARE_PROCESS = winnt::SERVICE_WIN32_SHARE_PROCESS;
+        const SHARE_PROCESS = Services::SERVICE_WIN32_SHARE_PROCESS;
 
         /// The service runs in its own process under the logged-on user account.
-        const USER_OWN_PROCESS = winnt::SERVICE_USER_OWN_PROCESS;
+        const USER_OWN_PROCESS = Services::SERVICE_USER_OWN_PROCESS;
 
         /// The service shares a process with one or more other services that run under the logged-on user account.
-        const USER_SHARE_PROCESS = winnt::SERVICE_USER_SHARE_PROCESS;
+        const USER_SHARE_PROCESS = Services::SERVICE_USER_SHARE_PROCESS;
 
         /// The service can be interactive.
-        const INTERACTIVE_PROCESS = winnt::SERVICE_INTERACTIVE_PROCESS;
+        const INTERACTIVE_PROCESS = SystemServices::SERVICE_INTERACTIVE_PROCESS;
     }
 }
 
@@ -49,28 +52,28 @@ bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
     pub struct ServiceAccess: u32 {
         /// Can query the service status
-        const QUERY_STATUS = winsvc::SERVICE_QUERY_STATUS;
+        const QUERY_STATUS = Services::SERVICE_QUERY_STATUS;
 
         /// Can start the service
-        const START = winsvc::SERVICE_START;
+        const START = Services::SERVICE_START;
 
         /// Can stop the service
-        const STOP = winsvc::SERVICE_STOP;
+        const STOP = Services::SERVICE_STOP;
 
         /// Can pause or continue the service execution
-        const PAUSE_CONTINUE = winsvc::SERVICE_PAUSE_CONTINUE;
+        const PAUSE_CONTINUE = Services::SERVICE_PAUSE_CONTINUE;
 
         /// Can ask the service to report its status
-        const INTERROGATE = winsvc::SERVICE_INTERROGATE;
+        const INTERROGATE = Services::SERVICE_INTERROGATE;
 
         /// Can delete the service
-        const DELETE = winnt::DELETE;
+        const DELETE = SystemServices::DELETE;
 
         /// Can query the services configuration
-        const QUERY_CONFIG = winsvc::SERVICE_QUERY_CONFIG;
+        const QUERY_CONFIG = Services::SERVICE_QUERY_CONFIG;
 
         /// Can change the services configuration
-        const CHANGE_CONFIG = winsvc::SERVICE_CHANGE_CONFIG;
+        const CHANGE_CONFIG = Services::SERVICE_CHANGE_CONFIG;
     }
 }
 
@@ -79,11 +82,11 @@ bitflags::bitflags! {
 #[repr(u32)]
 pub enum ServiceStartType {
     /// Autostart on system startup
-    AutoStart = winnt::SERVICE_AUTO_START,
+    AutoStart = Services::SERVICE_AUTO_START,
     /// Service is enabled, can be started manually
-    OnDemand = winnt::SERVICE_DEMAND_START,
+    OnDemand = Services::SERVICE_DEMAND_START,
     /// Disabled service
-    Disabled = winnt::SERVICE_DISABLED,
+    Disabled = Services::SERVICE_DISABLED,
 }
 
 impl ServiceStartType {
@@ -107,10 +110,10 @@ impl ServiceStartType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceErrorControl {
-    Critical = winnt::SERVICE_ERROR_CRITICAL,
-    Ignore = winnt::SERVICE_ERROR_IGNORE,
-    Normal = winnt::SERVICE_ERROR_NORMAL,
-    Severe = winnt::SERVICE_ERROR_SEVERE,
+    Critical = Services::SERVICE_ERROR_CRITICAL,
+    Ignore = Services::SERVICE_ERROR_IGNORE,
+    Normal = Services::SERVICE_ERROR_NORMAL,
+    Severe = Services::SERVICE_ERROR_SEVERE,
 }
 
 impl ServiceErrorControl {
@@ -169,26 +172,26 @@ impl ServiceDependency {
 
 /// Enum describing the types of actions that the service control manager can perform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum ServiceActionType {
-    None = winsvc::SC_ACTION_NONE,
-    Reboot = winsvc::SC_ACTION_REBOOT,
-    Restart = winsvc::SC_ACTION_RESTART,
-    RunCommand = winsvc::SC_ACTION_RUN_COMMAND,
+    None = Services::SC_ACTION_NONE,
+    Reboot = Services::SC_ACTION_REBOOT,
+    Restart = Services::SC_ACTION_RESTART,
+    RunCommand = Services::SC_ACTION_RUN_COMMAND,
 }
 
 impl ServiceActionType {
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
+    pub fn to_raw(&self) -> i32 {
+        *self as i32
     }
 
-    pub fn from_raw(raw: u32) -> Result<ServiceActionType, ParseRawError> {
+    pub fn from_raw(raw: i32) -> Result<ServiceActionType, ParseRawError> {
         match raw {
             x if x == ServiceActionType::None.to_raw() => Ok(ServiceActionType::None),
             x if x == ServiceActionType::Reboot.to_raw() => Ok(ServiceActionType::Reboot),
             x if x == ServiceActionType::Restart.to_raw() => Ok(ServiceActionType::Restart),
             x if x == ServiceActionType::RunCommand.to_raw() => Ok(ServiceActionType::RunCommand),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
         }
     }
 }
@@ -206,12 +209,12 @@ pub struct ServiceAction {
     /// # Panics
     ///
     /// Converting this to the FFI form will panic if the delay is too large to fit as milliseconds
-    /// in a `DWORD`.
+    /// in a `u32`.
     pub delay: Duration,
 }
 
 impl ServiceAction {
-    pub fn from_raw(raw: winsvc::SC_ACTION) -> crate::Result<ServiceAction> {
+    pub fn from_raw(raw: Services::SC_ACTION) -> crate::Result<ServiceAction> {
         Ok(ServiceAction {
             action_type: ServiceActionType::from_raw(raw.Type)
                 .map_err(Error::InvalidServiceActionType)?,
@@ -219,20 +222,20 @@ impl ServiceAction {
         })
     }
 
-    pub fn to_raw(&self) -> winsvc::SC_ACTION {
-        winsvc::SC_ACTION {
+    pub fn to_raw(&self) -> Services::SC_ACTION {
+        Services::SC_ACTION {
             Type: self.action_type.to_raw(),
-            Delay: DWORD::try_from(self.delay.as_millis()).expect("Too long delay"),
+            Delay: u32::try_from(self.delay.as_millis()).expect("Too long delay"),
         }
     }
 }
 
-/// A enum that representats the reset period for the failure counter.
+/// A enum that represents the reset period for the failure counter.
 ///
 /// # Panics
 ///
 /// Converting this to the FFI form will panic if the period is too large to fit as seconds in a
-/// `DWORD`.
+/// `u32`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceFailureResetPeriod {
     Never,
@@ -240,18 +243,18 @@ pub enum ServiceFailureResetPeriod {
 }
 
 impl ServiceFailureResetPeriod {
-    pub fn from_raw(raw: DWORD) -> ServiceFailureResetPeriod {
+    pub fn from_raw(raw: u32) -> ServiceFailureResetPeriod {
         match raw {
             INFINITE => ServiceFailureResetPeriod::Never,
             _ => ServiceFailureResetPeriod::After(Duration::from_secs(raw as u64)),
         }
     }
 
-    pub fn to_raw(&self) -> DWORD {
+    pub fn to_raw(&self) -> u32 {
         match self {
             ServiceFailureResetPeriod::Never => INFINITE,
             ServiceFailureResetPeriod::After(duration) => {
-                DWORD::try_from(duration.as_secs()).expect("Too long reset period")
+                u32::try_from(duration.as_secs()).expect("Too long reset period")
             }
         }
     }
@@ -294,7 +297,7 @@ impl ServiceFailureActions {
     /// Returns an error if a field inside the `SERVICE_FAILURE_ACTIONSW` does not have a valid
     /// value.
     pub unsafe fn from_raw(
-        raw: winsvc::SERVICE_FAILURE_ACTIONSW,
+        raw: Services::SERVICE_FAILURE_ACTIONSW,
     ) -> crate::Result<ServiceFailureActions> {
         let reboot_msg = ptr::NonNull::new(raw.lpRebootMsg)
             .map(|wrapped_ptr| WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string());
@@ -308,7 +311,7 @@ impl ServiceFailureActions {
             Some(
                 (0..raw.cActions)
                     .map(|i| {
-                        let array_element_ptr: *mut winsvc::SC_ACTION =
+                        let array_element_ptr: *mut Services::SC_ACTION =
                             raw.lpsaActions.offset(i as isize);
                         ServiceAction::from_raw(*array_element_ptr)
                     })
@@ -372,13 +375,13 @@ pub(crate) struct RawServiceInfo {
     pub display_name: WideCString,
 
     /// The service type
-    pub service_type: DWORD,
+    pub service_type: u32,
 
     /// The service startup options
-    pub start_type: DWORD,
+    pub start_type: u32,
 
     /// The severity of the error, and action taken, if this service fails to start.
-    pub error_control: DWORD,
+    pub error_control: u32,
 
     /// Path to the service binary with arguments appended
     pub launch_command: WideCString,
@@ -503,7 +506,7 @@ impl ServiceConfig {
     /// # Errors
     ///
     /// Returns an error if a field inside the `QUERY_SERVICE_CONFIGW` does not have a valid value.
-    pub unsafe fn from_raw(raw: winsvc::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
+    pub unsafe fn from_raw(raw: Services::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
             .map(ServiceDependency::from_system_identifier)
@@ -545,9 +548,9 @@ impl ServiceConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum HardwareProfileChangeParam {
-    ConfigChanged = dbt::DBT_CONFIGCHANGED as u32,
-    QueryChangeConfig = dbt::DBT_QUERYCHANGECONFIG as u32,
-    ConfigChangeCanceled = dbt::DBT_CONFIGCHANGECANCELED as u32,
+    ConfigChanged = SystemServices::DBT_CONFIGCHANGED,
+    QueryChangeConfig = SystemServices::DBT_QUERYCHANGECONFIG,
+    ConfigChangeCanceled = SystemServices::DBT_CONFIGCHANGECANCELED,
 }
 
 impl HardwareProfileChangeParam {
@@ -574,24 +577,24 @@ impl HardwareProfileChangeParam {
 /// Enum indicates the current power source as
 /// the Data member of GUID_ACDC_POWER_SOURCE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum PowerSource {
-    Ac = winnt::PoAc,
-    Dc = winnt::PoDc,
-    Hot = winnt::PoHot,
+    Ac = Power::PoAc,
+    Dc = Power::PoDc,
+    Hot = Power::PoHot,
 }
 
 impl PowerSource {
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
+    pub fn to_raw(&self) -> i32 {
+        *self as i32
     }
 
-    pub fn from_raw(raw: u32) -> Result<PowerSource, ParseRawError> {
+    pub fn from_raw(raw: i32) -> Result<PowerSource, ParseRawError> {
         match raw {
             x if x == PowerSource::Ac.to_raw() => Ok(PowerSource::Ac),
             x if x == PowerSource::Dc.to_raw() => Ok(PowerSource::Dc),
             x if x == PowerSource::Hot.to_raw() => Ok(PowerSource::Hot),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
         }
     }
 }
@@ -599,24 +602,24 @@ impl PowerSource {
 /// Enum indicates the current monitor's display state as
 /// the Data member of GUID_CONSOLE_DISPLAY_STATE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum DisplayState {
-    Off = winnt::PowerMonitorOff,
-    On = winnt::PowerMonitorOn,
-    Dimmed = winnt::PowerMonitorDim,
+    Off = SystemServices::PowerMonitorOff,
+    On = SystemServices::PowerMonitorOn,
+    Dimmed = SystemServices::PowerMonitorDim,
 }
 
 impl DisplayState {
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
+    pub fn to_raw(&self) -> i32 {
+        *self as i32
     }
 
-    pub fn from_raw(raw: u32) -> Result<DisplayState, ParseRawError> {
+    pub fn from_raw(raw: i32) -> Result<DisplayState, ParseRawError> {
         match raw {
             x if x == DisplayState::Off.to_raw() => Ok(DisplayState::Off),
             x if x == DisplayState::On.to_raw() => Ok(DisplayState::On),
             x if x == DisplayState::Dimmed.to_raw() => Ok(DisplayState::Dimmed),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
         }
     }
 }
@@ -625,22 +628,22 @@ impl DisplayState {
 /// across all local and remote sessions on the system as
 /// the Data member of GUID_GLOBAL_USER_PRESENCE notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum UserStatus {
-    Present = winnt::PowerUserPresent,
-    Inactive = winnt::PowerUserInactive,
+    Present = SystemServices::PowerUserPresent,
+    Inactive = SystemServices::PowerUserInactive,
 }
 
 impl UserStatus {
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
+    pub fn to_raw(&self) -> i32 {
+        *self as i32
     }
 
-    pub fn from_raw(raw: u32) -> Result<UserStatus, ParseRawError> {
+    pub fn from_raw(raw: i32) -> Result<UserStatus, ParseRawError> {
         match raw {
             x if x == UserStatus::Present.to_raw() => Ok(UserStatus::Present),
             x if x == UserStatus::Inactive.to_raw() => Ok(UserStatus::Inactive),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
         }
     }
 }
@@ -691,6 +694,10 @@ impl BatterySaverState {
     }
 }
 
+fn is_equal_guid(a: &GUID, b: &GUID) -> bool {
+    a.data1 == b.data1 && a.data2 == b.data2 && a.data3 == b.data3 && a.data4 == b.data4
+}
+
 /// Enum indicates the power scheme personality as
 /// the Data member of GUID_POWERSCHEME_PERSONALITY notification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -703,13 +710,13 @@ pub enum PowerSchemePersonality {
 impl PowerSchemePersonality {
     pub fn from_guid(guid: &GUID) -> Result<PowerSchemePersonality, ParseRawError> {
         match guid {
-            x if IsEqualGUID(x, &winnt::GUID_MIN_POWER_SAVINGS) => {
+            x if is_equal_guid(x, &SystemServices::GUID_MIN_POWER_SAVINGS) => {
                 Ok(PowerSchemePersonality::HighPerformance)
             }
-            x if IsEqualGUID(x, &winnt::GUID_MAX_POWER_SAVINGS) => {
+            x if is_equal_guid(x, &SystemServices::GUID_MAX_POWER_SAVINGS) => {
                 Ok(PowerSchemePersonality::PowerSaver)
             }
-            x if IsEqualGUID(x, &winnt::GUID_TYPICAL_POWER_SAVINGS) => {
+            x if is_equal_guid(x, &SystemServices::GUID_TYPICAL_POWER_SAVINGS) => {
                 Ok(PowerSchemePersonality::Automatic)
             }
             x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
@@ -740,7 +747,7 @@ impl AwayModeState {
     }
 }
 
-/// Struct converted from winuser::POWERBROADCAST_SETTING
+/// Struct converted from Power::POWERBROADCAST_SETTING
 ///
 /// Please refer to MSDN for more info about the data members:
 /// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
@@ -762,59 +769,59 @@ impl PowerBroadcastSetting {
     ///
     /// # Safety
     ///
-    /// The `raw` must be a valid winuser::POWERBROADCAST_SETTING pointer.
+    /// The `raw` must be a valid Power::POWERBROADCAST_SETTING pointer.
     /// Otherwise, it is undefined behavior.
     pub unsafe fn from_raw(raw: *mut c_void) -> Result<PowerBroadcastSetting, ParseRawError> {
-        let setting = &*(raw as *const winuser::POWERBROADCAST_SETTING);
+        let setting = &*(raw as *const Power::POWERBROADCAST_SETTING);
         let data = &setting.Data as *const u8;
 
         match &setting.PowerSetting {
-            x if IsEqualGUID(x, &winnt::GUID_ACDC_POWER_SOURCE) => {
-                let power_source = *(data as *const u32);
+            x if is_equal_guid(x, &SystemServices::GUID_ACDC_POWER_SOURCE) => {
+                let power_source = *(data as *const i32);
                 Ok(PowerBroadcastSetting::AcdcPowerSource(
                     PowerSource::from_raw(power_source)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_BATTERY_PERCENTAGE_REMAINING) => {
+            x if is_equal_guid(x, &SystemServices::GUID_BATTERY_PERCENTAGE_REMAINING) => {
                 let percentage = *(data as *const u32);
                 Ok(PowerBroadcastSetting::BatteryPercentageRemaining(
                     percentage,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_CONSOLE_DISPLAY_STATE) => {
-                let display_state = *(data as *const u32);
+            x if is_equal_guid(x, &SystemServices::GUID_CONSOLE_DISPLAY_STATE) => {
+                let display_state = *(data as *const i32);
                 Ok(PowerBroadcastSetting::ConsoleDisplayState(
                     DisplayState::from_raw(display_state)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_GLOBAL_USER_PRESENCE) => {
-                let user_status = *(data as *const u32);
+            x if is_equal_guid(x, &SystemServices::GUID_GLOBAL_USER_PRESENCE) => {
+                let user_status = *(data as *const i32);
                 Ok(PowerBroadcastSetting::GlobalUserPresence(
                     UserStatus::from_raw(user_status)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_IDLE_BACKGROUND_TASK) => {
+            x if is_equal_guid(x, &SystemServices::GUID_IDLE_BACKGROUND_TASK) => {
                 Ok(PowerBroadcastSetting::IdleBackgroundTask)
             }
-            x if IsEqualGUID(x, &winnt::GUID_MONITOR_POWER_ON) => {
+            x if is_equal_guid(x, &SystemServices::GUID_MONITOR_POWER_ON) => {
                 let monitor_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::MonitorPowerOn(
                     MonitorState::from_raw(monitor_state)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_POWER_SAVING_STATUS) => {
+            x if is_equal_guid(x, &SystemServices::GUID_POWER_SAVING_STATUS) => {
                 let battery_saver_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::PowerSavingStatus(
                     BatterySaverState::from_raw(battery_saver_state)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_POWERSCHEME_PERSONALITY) => {
+            x if is_equal_guid(x, &SystemServices::GUID_POWERSCHEME_PERSONALITY) => {
                 let guid = *(data as *const GUID);
                 Ok(PowerBroadcastSetting::PowerSchemePersonality(
                     PowerSchemePersonality::from_guid(&guid)?,
                 ))
             }
-            x if IsEqualGUID(x, &winnt::GUID_SYSTEM_AWAYMODE) => {
+            x if is_equal_guid(x, &SystemServices::GUID_SYSTEM_AWAYMODE) => {
                 let away_mode_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::SystemAwayMode(
                     AwayModeState::from_raw(away_mode_state)?,
@@ -852,19 +859,21 @@ impl PowerEventParam {
         event_type: u32,
         event_data: *mut c_void,
     ) -> Result<Self, ParseRawError> {
-        match event_type as usize {
-            winuser::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
-            winuser::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
-            winuser::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
-            winuser::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
-            winuser::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
+        match event_type {
+            WindowsAndMessaging::PBT_APMPOWERSTATUSCHANGE => Ok(PowerEventParam::PowerStatusChange),
+            WindowsAndMessaging::PBT_APMRESUMEAUTOMATIC => Ok(PowerEventParam::ResumeAutomatic),
+            WindowsAndMessaging::PBT_APMRESUMESUSPEND => Ok(PowerEventParam::ResumeSuspend),
+            WindowsAndMessaging::PBT_APMSUSPEND => Ok(PowerEventParam::Suspend),
+            WindowsAndMessaging::PBT_POWERSETTINGCHANGE => Ok(PowerEventParam::PowerSettingChange(
                 PowerBroadcastSetting::from_raw(event_data)?,
             )),
-            winuser::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
-            winuser::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
-            winuser::PBT_APMQUERYSUSPEND => Ok(PowerEventParam::QuerySuspend),
-            winuser::PBT_APMQUERYSUSPENDFAILED => Ok(PowerEventParam::QuerySuspendFailed),
-            winuser::PBT_APMRESUMECRITICAL => Ok(PowerEventParam::ResumeCritical),
+            WindowsAndMessaging::PBT_APMBATTERYLOW => Ok(PowerEventParam::BatteryLow),
+            WindowsAndMessaging::PBT_APMOEMEVENT => Ok(PowerEventParam::OemEvent),
+            WindowsAndMessaging::PBT_APMQUERYSUSPEND => Ok(PowerEventParam::QuerySuspend),
+            WindowsAndMessaging::PBT_APMQUERYSUSPENDFAILED => {
+                Ok(PowerEventParam::QuerySuspendFailed)
+            }
+            WindowsAndMessaging::PBT_APMRESUMECRITICAL => Ok(PowerEventParam::ResumeCritical),
             _ => Err(ParseRawError::InvalidInteger(event_type)),
         }
     }
@@ -874,17 +883,17 @@ impl PowerEventParam {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum SessionChangeReason {
-    ConsoleConnect = winuser::WTS_CONSOLE_CONNECT as u32,
-    ConsoleDisconnect = winuser::WTS_CONSOLE_DISCONNECT as u32,
-    RemoteConnect = winuser::WTS_REMOTE_CONNECT as u32,
-    RemoteDisconnect = winuser::WTS_REMOTE_DISCONNECT as u32,
-    SessionLogon = winuser::WTS_SESSION_LOGON as u32,
-    SessionLogoff = winuser::WTS_SESSION_LOGOFF as u32,
-    SessionLock = winuser::WTS_SESSION_LOCK as u32,
-    SessionUnlock = winuser::WTS_SESSION_UNLOCK as u32,
-    SessionRemoteControl = winuser::WTS_SESSION_REMOTE_CONTROL as u32,
-    SessionCreate = winuser::WTS_SESSION_CREATE as u32,
-    SessionTerminate = winuser::WTS_SESSION_TERMINATE as u32,
+    ConsoleConnect = WindowsAndMessaging::WTS_CONSOLE_CONNECT,
+    ConsoleDisconnect = WindowsAndMessaging::WTS_CONSOLE_DISCONNECT,
+    RemoteConnect = WindowsAndMessaging::WTS_REMOTE_CONNECT,
+    RemoteDisconnect = WindowsAndMessaging::WTS_REMOTE_DISCONNECT,
+    SessionLogon = WindowsAndMessaging::WTS_SESSION_LOGON,
+    SessionLogoff = WindowsAndMessaging::WTS_SESSION_LOGOFF,
+    SessionLock = WindowsAndMessaging::WTS_SESSION_LOCK,
+    SessionUnlock = WindowsAndMessaging::WTS_SESSION_UNLOCK,
+    SessionRemoteControl = WindowsAndMessaging::WTS_SESSION_REMOTE_CONTROL,
+    SessionCreate = WindowsAndMessaging::WTS_SESSION_CREATE,
+    SessionTerminate = WindowsAndMessaging::WTS_SESSION_TERMINATE,
 }
 
 impl SessionChangeReason {
@@ -932,7 +941,7 @@ impl SessionChangeReason {
     }
 }
 
-/// Struct converted from winuser::WTSSESSION_NOTIFICATION
+/// Struct converted from RemoteDesktop::WTSSESSION_NOTIFICATION
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionNotification {
     pub size: u32,
@@ -940,7 +949,7 @@ pub struct SessionNotification {
 }
 
 impl SessionNotification {
-    pub fn from_raw(raw: winuser::WTSSESSION_NOTIFICATION) -> Self {
+    pub fn from_raw(raw: RemoteDesktop::WTSSESSION_NOTIFICATION) -> Self {
         SessionNotification {
             size: raw.cbSize,
             session_id: raw.dwSessionId,
@@ -960,13 +969,13 @@ impl SessionChangeParam {
     ///
     /// # Safety
     ///
-    /// The `event_data` must be a valid winuser::WTSSESSION_NOTIFICATION pointer.
+    /// The `event_data` must be a valid RemoteDesktop::WTSSESSION_NOTIFICATION pointer.
     /// Otherwise, it is undefined behavior.
     pub unsafe fn from_event(
         event_type: u32,
         event_data: *mut c_void,
     ) -> Result<Self, ParseRawError> {
-        let notification = *(event_data as *const winuser::WTSSESSION_NOTIFICATION);
+        let notification = *(event_data as *const RemoteDesktop::WTSSESSION_NOTIFICATION);
 
         Ok(SessionChangeParam {
             reason: SessionChangeReason::from_raw(event_type)?,
@@ -1010,54 +1019,54 @@ impl ServiceControl {
         event_data: *mut c_void,
     ) -> Result<Self, ParseRawError> {
         match raw {
-            winsvc::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
-            winsvc::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
-            winsvc::SERVICE_CONTROL_NETBINDADD => Ok(ServiceControl::NetBindAdd),
-            winsvc::SERVICE_CONTROL_NETBINDDISABLE => Ok(ServiceControl::NetBindDisable),
-            winsvc::SERVICE_CONTROL_NETBINDENABLE => Ok(ServiceControl::NetBindEnable),
-            winsvc::SERVICE_CONTROL_NETBINDREMOVE => Ok(ServiceControl::NetBindRemove),
-            winsvc::SERVICE_CONTROL_PARAMCHANGE => Ok(ServiceControl::ParamChange),
-            winsvc::SERVICE_CONTROL_PAUSE => Ok(ServiceControl::Pause),
-            winsvc::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
-            winsvc::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
-            winsvc::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
-            winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE => {
+            Services::SERVICE_CONTROL_CONTINUE => Ok(ServiceControl::Continue),
+            Services::SERVICE_CONTROL_INTERROGATE => Ok(ServiceControl::Interrogate),
+            Services::SERVICE_CONTROL_NETBINDADD => Ok(ServiceControl::NetBindAdd),
+            Services::SERVICE_CONTROL_NETBINDDISABLE => Ok(ServiceControl::NetBindDisable),
+            Services::SERVICE_CONTROL_NETBINDENABLE => Ok(ServiceControl::NetBindEnable),
+            Services::SERVICE_CONTROL_NETBINDREMOVE => Ok(ServiceControl::NetBindRemove),
+            Services::SERVICE_CONTROL_PARAMCHANGE => Ok(ServiceControl::ParamChange),
+            Services::SERVICE_CONTROL_PAUSE => Ok(ServiceControl::Pause),
+            Services::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
+            Services::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
+            Services::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
+            Services::SERVICE_CONTROL_HARDWAREPROFILECHANGE => {
                 HardwareProfileChangeParam::from_raw(event_type)
                     .map(ServiceControl::HardwareProfileChange)
             }
-            winsvc::SERVICE_CONTROL_POWEREVENT => {
+            Services::SERVICE_CONTROL_POWEREVENT => {
                 PowerEventParam::from_event(event_type, event_data).map(ServiceControl::PowerEvent)
             }
-            winsvc::SERVICE_CONTROL_SESSIONCHANGE => {
+            Services::SERVICE_CONTROL_SESSIONCHANGE => {
                 SessionChangeParam::from_event(event_type, event_data)
                     .map(ServiceControl::SessionChange)
             }
-            winsvc::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
-            winsvc::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
+            Services::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
+            Services::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
             _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
 
     pub fn raw_service_control_type(&self) -> u32 {
         match self {
-            ServiceControl::Continue => winsvc::SERVICE_CONTROL_CONTINUE,
-            ServiceControl::Interrogate => winsvc::SERVICE_CONTROL_INTERROGATE,
-            ServiceControl::NetBindAdd => winsvc::SERVICE_CONTROL_NETBINDADD,
-            ServiceControl::NetBindDisable => winsvc::SERVICE_CONTROL_NETBINDDISABLE,
-            ServiceControl::NetBindEnable => winsvc::SERVICE_CONTROL_NETBINDENABLE,
-            ServiceControl::NetBindRemove => winsvc::SERVICE_CONTROL_NETBINDREMOVE,
-            ServiceControl::ParamChange => winsvc::SERVICE_CONTROL_PARAMCHANGE,
-            ServiceControl::Pause => winsvc::SERVICE_CONTROL_PAUSE,
-            ServiceControl::Preshutdown => winsvc::SERVICE_CONTROL_PRESHUTDOWN,
-            ServiceControl::Shutdown => winsvc::SERVICE_CONTROL_SHUTDOWN,
-            ServiceControl::Stop => winsvc::SERVICE_CONTROL_STOP,
+            ServiceControl::Continue => Services::SERVICE_CONTROL_CONTINUE,
+            ServiceControl::Interrogate => Services::SERVICE_CONTROL_INTERROGATE,
+            ServiceControl::NetBindAdd => Services::SERVICE_CONTROL_NETBINDADD,
+            ServiceControl::NetBindDisable => Services::SERVICE_CONTROL_NETBINDDISABLE,
+            ServiceControl::NetBindEnable => Services::SERVICE_CONTROL_NETBINDENABLE,
+            ServiceControl::NetBindRemove => Services::SERVICE_CONTROL_NETBINDREMOVE,
+            ServiceControl::ParamChange => Services::SERVICE_CONTROL_PARAMCHANGE,
+            ServiceControl::Pause => Services::SERVICE_CONTROL_PAUSE,
+            ServiceControl::Preshutdown => Services::SERVICE_CONTROL_PRESHUTDOWN,
+            ServiceControl::Shutdown => Services::SERVICE_CONTROL_SHUTDOWN,
+            ServiceControl::Stop => Services::SERVICE_CONTROL_STOP,
             ServiceControl::HardwareProfileChange(_) => {
-                winsvc::SERVICE_CONTROL_HARDWAREPROFILECHANGE
+                Services::SERVICE_CONTROL_HARDWAREPROFILECHANGE
             }
-            ServiceControl::PowerEvent(_) => winsvc::SERVICE_CONTROL_POWEREVENT,
-            ServiceControl::SessionChange(_) => winsvc::SERVICE_CONTROL_SESSIONCHANGE,
-            ServiceControl::TimeChange => winsvc::SERVICE_CONTROL_TIMECHANGE,
-            ServiceControl::TriggerEvent => winsvc::SERVICE_CONTROL_TRIGGEREVENT,
+            ServiceControl::PowerEvent(_) => Services::SERVICE_CONTROL_POWEREVENT,
+            ServiceControl::SessionChange(_) => Services::SERVICE_CONTROL_SESSIONCHANGE,
+            ServiceControl::TimeChange => Services::SERVICE_CONTROL_TIMECHANGE,
+            ServiceControl::TriggerEvent => Services::SERVICE_CONTROL_TRIGGEREVENT,
         }
     }
 }
@@ -1066,13 +1075,13 @@ impl ServiceControl {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceState {
-    Stopped = winsvc::SERVICE_STOPPED,
-    StartPending = winsvc::SERVICE_START_PENDING,
-    StopPending = winsvc::SERVICE_STOP_PENDING,
-    Running = winsvc::SERVICE_RUNNING,
-    ContinuePending = winsvc::SERVICE_CONTINUE_PENDING,
-    PausePending = winsvc::SERVICE_PAUSE_PENDING,
-    Paused = winsvc::SERVICE_PAUSED,
+    Stopped = Services::SERVICE_STOPPED,
+    StartPending = Services::SERVICE_START_PENDING,
+    StopPending = Services::SERVICE_STOP_PENDING,
+    Running = Services::SERVICE_RUNNING,
+    ContinuePending = Services::SERVICE_CONTINUE_PENDING,
+    PausePending = Services::SERVICE_PAUSE_PENDING,
+    Paused = Services::SERVICE_PAUSED,
 }
 
 impl ServiceState {
@@ -1106,8 +1115,8 @@ impl ServiceState {
 /// Refer to the corresponding MSDN article for more info:\
 /// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
 ///
-/// [`dwWin32ExitCode`]: winsvc::SERVICE_STATUS::dwWin32ExitCode
-/// [`dwServiceSpecificExitCode`]: winsvc::SERVICE_STATUS::dwServiceSpecificExitCode
+/// [`dwWin32ExitCode`]: Services::SERVICE_STATUS::dwWin32ExitCode
+/// [`dwServiceSpecificExitCode`]: Services::SERVICE_STATUS::dwServiceSpecificExitCode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceExitCode {
     Win32(u32),
@@ -1118,7 +1127,7 @@ impl ServiceExitCode {
     /// A `ServiceExitCode` indicating success, no errors.
     pub const NO_ERROR: Self = ServiceExitCode::Win32(NO_ERROR);
 
-    fn copy_to(&self, raw_service_status: &mut winsvc::SERVICE_STATUS) {
+    fn copy_to(&self, raw_service_status: &mut Services::SERVICE_STATUS) {
         match *self {
             ServiceExitCode::Win32(win32_error_code) => {
                 raw_service_status.dwWin32ExitCode = win32_error_code;
@@ -1138,8 +1147,8 @@ impl Default for ServiceExitCode {
     }
 }
 
-impl<'a> From<&'a winsvc::SERVICE_STATUS> for ServiceExitCode {
-    fn from(service_status: &'a winsvc::SERVICE_STATUS) -> Self {
+impl<'a> From<&'a Services::SERVICE_STATUS> for ServiceExitCode {
+    fn from(service_status: &'a Services::SERVICE_STATUS) -> Self {
         if service_status.dwWin32ExitCode == ERROR_SERVICE_SPECIFIC_ERROR {
             ServiceExitCode::ServiceSpecific(service_status.dwServiceSpecificExitCode)
         } else {
@@ -1148,8 +1157,8 @@ impl<'a> From<&'a winsvc::SERVICE_STATUS> for ServiceExitCode {
     }
 }
 
-impl<'a> From<&'a winsvc::SERVICE_STATUS_PROCESS> for ServiceExitCode {
-    fn from(service_status: &'a winsvc::SERVICE_STATUS_PROCESS) -> Self {
+impl<'a> From<&'a Services::SERVICE_STATUS_PROCESS> for ServiceExitCode {
+    fn from(service_status: &'a Services::SERVICE_STATUS_PROCESS) -> Self {
         if service_status.dwWin32ExitCode == ERROR_SERVICE_SPECIFIC_ERROR {
             ServiceExitCode::ServiceSpecific(service_status.dwServiceSpecificExitCode)
         } else {
@@ -1164,45 +1173,45 @@ bitflags::bitflags! {
         /// The service is a network component that can accept changes in its binding without being
         /// stopped and restarted. This allows service to receive `ServiceControl::Netbind*`
         /// family of events.
-        const NETBIND_CHANGE = winsvc::SERVICE_ACCEPT_NETBINDCHANGE;
+        const NETBIND_CHANGE = Services::SERVICE_ACCEPT_NETBINDCHANGE;
 
         /// The service can reread its startup parameters without being stopped and restarted.
-        const PARAM_CHANGE = winsvc::SERVICE_ACCEPT_PARAMCHANGE;
+        const PARAM_CHANGE = Services::SERVICE_ACCEPT_PARAMCHANGE;
 
         /// The service can be paused and continued.
-        const PAUSE_CONTINUE = winsvc::SERVICE_ACCEPT_PAUSE_CONTINUE;
+        const PAUSE_CONTINUE = Services::SERVICE_ACCEPT_PAUSE_CONTINUE;
 
         /// The service can perform preshutdown tasks.
         /// Mutually exclusive with shutdown.
-        const PRESHUTDOWN = winsvc::SERVICE_ACCEPT_PRESHUTDOWN;
+        const PRESHUTDOWN = Services::SERVICE_ACCEPT_PRESHUTDOWN;
 
         /// The service is notified when system shutdown occurs.
         /// Mutually exclusive with preshutdown.
-        const SHUTDOWN = winsvc::SERVICE_ACCEPT_SHUTDOWN;
+        const SHUTDOWN = Services::SERVICE_ACCEPT_SHUTDOWN;
 
         /// The service can be stopped.
-        const STOP = winsvc::SERVICE_ACCEPT_STOP;
+        const STOP = Services::SERVICE_ACCEPT_STOP;
 
         /// The service is notified when the computer's hardware profile has changed.
         /// This enables the system to send SERVICE_CONTROL_HARDWAREPROFILECHANGE
         /// notifications to the service.
-        const HARDWARE_PROFILE_CHANGE = winsvc::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
+        const HARDWARE_PROFILE_CHANGE = Services::SERVICE_ACCEPT_HARDWAREPROFILECHANGE;
 
         /// The service is notified when the computer's power status has changed.
         /// This enables the system to send SERVICE_CONTROL_POWEREVENT notifications to the service.
-        const POWER_EVENT = winsvc::SERVICE_ACCEPT_POWEREVENT;
+        const POWER_EVENT = Services::SERVICE_ACCEPT_POWEREVENT;
 
         /// The service is notified when the computer's session status has changed.
         /// This enables the system to send SERVICE_CONTROL_SESSIONCHANGE notifications to the service.
-        const SESSION_CHANGE = winsvc::SERVICE_ACCEPT_SESSIONCHANGE;
+        const SESSION_CHANGE = Services::SERVICE_ACCEPT_SESSIONCHANGE;
 
         /// The service is notified when the system time has changed.
         /// This enables the system to send SERVICE_CONTROL_TIMECHANGE notifications to the service.
-        const TIME_CHANGE = winsvc::SERVICE_ACCEPT_TIMECHANGE;
+        const TIME_CHANGE = Services::SERVICE_ACCEPT_TIMECHANGE;
 
         /// The service is notified when an event for which the service has registered occurs.
         /// This enables the system to send SERVICE_CONTROL_TRIGGEREVENT notifications to the service.
-        const TRIGGER_EVENT = winsvc::SERVICE_ACCEPT_TRIGGEREVENT;
+        const TRIGGER_EVENT = Services::SERVICE_ACCEPT_TRIGGEREVENT;
     }
 }
 
@@ -1214,7 +1223,7 @@ bitflags::bitflags! {
 /// particular how to fill in the `exit_code`, `checkpoint`, `wait_hint` fields:\
 /// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx>
 ///
-/// [`SERVICE_STATUS`]: winsvc::SERVICE_STATUS
+/// [`SERVICE_STATUS`]: Services::SERVICE_STATUS
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceStatus {
     /// Type of service.
@@ -1245,7 +1254,7 @@ pub struct ServiceStatus {
     /// # Panics
     ///
     /// Converting this to the FFI form will panic if the duration is too large to fit as
-    /// milliseconds in a `DWORD`.
+    /// milliseconds in a `u32`.
     pub wait_hint: Duration,
 
     /// Process ID of the service
@@ -1254,8 +1263,8 @@ pub struct ServiceStatus {
 }
 
 impl ServiceStatus {
-    pub(crate) fn to_raw(&self) -> winsvc::SERVICE_STATUS {
-        let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
+    pub(crate) fn to_raw(&self) -> Services::SERVICE_STATUS {
+        let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS>() };
         raw_status.dwServiceType = self.service_type.bits();
         raw_status.dwCurrentState = self.current_state.to_raw();
         raw_status.dwControlsAccepted = self.controls_accepted.bits();
@@ -1265,7 +1274,7 @@ impl ServiceStatus {
         raw_status.dwCheckPoint = self.checkpoint;
 
         raw_status.dwWaitHint =
-            DWORD::try_from(self.wait_hint.as_millis()).expect("Too long wait_hint");
+            u32::try_from(self.wait_hint.as_millis()).expect("Too long wait_hint");
 
         raw_status
     }
@@ -1275,7 +1284,7 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw(raw: winsvc::SERVICE_STATUS) -> Result<Self, ParseRawError> {
+    fn from_raw(raw: Services::SERVICE_STATUS) -> Result<Self, ParseRawError> {
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
             current_state: ServiceState::from_raw(raw.dwCurrentState)?,
@@ -1292,7 +1301,7 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw_ex(raw: winsvc::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
+    fn from_raw_ex(raw: Services::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
         let current_state = ServiceState::from_raw(raw.dwCurrentState)?;
         let process_id = match current_state {
             ServiceState::Running => Some(raw.dwProcessId),
@@ -1356,14 +1365,16 @@ impl Service {
             .map(|s| WideCString::from_os_str(s).map_err(|_| Error::StartArgumentHasNulByte))
             .collect::<crate::Result<Vec<WideCString>>>()?;
 
-        let mut raw_service_arguments: Vec<*const u16> =
-            wide_service_arguments.iter().map(|s| s.as_ptr()).collect();
+        let raw_service_arguments: Vec<*mut u16> = wide_service_arguments
+            .iter()
+            .map(|s| s.as_ptr() as _)
+            .collect();
 
         let success = unsafe {
-            winsvc::StartServiceW(
+            Services::StartServiceW(
                 self.service_handle.raw_handle(),
                 raw_service_arguments.len() as u32,
-                raw_service_arguments.as_mut_ptr(),
+                raw_service_arguments.as_ptr(),
             )
         };
 
@@ -1405,14 +1416,14 @@ impl Service {
 
     /// Get the service status from the system.
     pub fn query_status(&self) -> crate::Result<ServiceStatus> {
-        let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS_PROCESS>() };
-        let mut bytes_needed: DWORD = 0;
+        let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS_PROCESS>() };
+        let mut bytes_needed: u32 = 0;
         let success = unsafe {
-            winsvc::QueryServiceStatusEx(
+            Services::QueryServiceStatusEx(
                 self.service_handle.raw_handle(),
-                winsvc::SC_STATUS_PROCESS_INFO,
+                Services::SC_STATUS_PROCESS_INFO,
                 &mut raw_status as *mut _ as _,
-                std::mem::size_of::<winsvc::SERVICE_STATUS_PROCESS>() as u32,
+                std::mem::size_of::<Services::SERVICE_STATUS_PROCESS>() as u32,
                 &mut bytes_needed,
             )
         };
@@ -1425,7 +1436,7 @@ impl Service {
 
     /// Delete the service from system registry.
     pub fn delete(self) -> crate::Result<()> {
-        let success = unsafe { winsvc::DeleteService(self.service_handle.raw_handle()) };
+        let success = unsafe { Services::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
@@ -1440,7 +1451,7 @@ impl Service {
         let mut bytes_written: u32 = 0;
 
         let success = unsafe {
-            winsvc::QueryServiceConfigW(
+            Services::QueryServiceConfigW(
                 self.service_handle.raw_handle(),
                 data.as_mut_ptr() as _,
                 data.len() as u32,
@@ -1452,7 +1463,7 @@ impl Service {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             unsafe {
-                let raw_config = data.as_ptr() as *const winsvc::QUERY_SERVICE_CONFIGW;
+                let raw_config = data.as_ptr() as *const Services::QUERY_SERVICE_CONFIGW;
                 ServiceConfig::from_raw(*raw_config)
             }
         }
@@ -1469,7 +1480,7 @@ impl Service {
     pub fn change_config(&self, service_info: &ServiceInfo) -> crate::Result<()> {
         let raw_info = RawServiceInfo::new(service_info)?;
         let success = unsafe {
-            winsvc::ChangeServiceConfigW(
+            Services::ChangeServiceConfigW(
                 self.service_handle.raw_handle(),
                 raw_info.service_type,
                 raw_info.start_type,
@@ -1508,13 +1519,13 @@ impl Service {
     /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-_service_failure_actions_flag>
     pub fn set_failure_actions_on_non_crash_failures(&self, enabled: bool) -> crate::Result<()> {
         let mut raw_failure_actions_flag =
-            unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONS_FLAG>() };
+            unsafe { mem::zeroed::<Services::SERVICE_FAILURE_ACTIONS_FLAG>() };
 
         raw_failure_actions_flag.fFailureActionsOnNonCrashFailures = if enabled { 1 } else { 0 };
 
         unsafe {
             self.change_config2(
-                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG,
+                Services::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG,
                 &mut raw_failure_actions_flag,
             )
             .map_err(Error::Winapi)
@@ -1526,8 +1537,8 @@ impl Service {
     pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
         let mut data = vec![0u8; MAX_QUERY_BUFFER_SIZE];
 
-        let raw_failure_actions_flag: winsvc::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
-            self.query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
+        let raw_failure_actions_flag: Services::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
+            self.query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
                 .map_err(Error::Winapi)?
         };
 
@@ -1549,7 +1560,7 @@ impl Service {
         // we can get away with not explicitly creating a structure in Rust.
         unsafe {
             self.change_config2(
-                winsvc::SERVICE_CONFIG_SERVICE_SID_INFO,
+                Services::SERVICE_CONFIG_SERVICE_SID_INFO,
                 &mut service_sid_type,
             )
             .map_err(Error::Winapi)
@@ -1561,8 +1572,8 @@ impl Service {
         unsafe {
             let mut data = vec![0u8; MAX_QUERY_BUFFER_SIZE];
 
-            let raw_failure_actions: winsvc::SERVICE_FAILURE_ACTIONSW = self
-                .query_config2(winsvc::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
+            let raw_failure_actions: Services::SERVICE_FAILURE_ACTIONSW = self
+                .query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
                 .map_err(Error::Winapi)?;
 
             ServiceFailureActions::from_raw(raw_failure_actions)
@@ -1620,13 +1631,14 @@ impl Service {
     /// # }
     /// ```
     pub fn update_failure_actions(&self, update: ServiceFailureActions) -> crate::Result<()> {
-        let mut raw_failure_actions = unsafe { mem::zeroed::<winsvc::SERVICE_FAILURE_ACTIONSW>() };
+        let mut raw_failure_actions =
+            unsafe { mem::zeroed::<Services::SERVICE_FAILURE_ACTIONSW>() };
 
         let mut reboot_msg = to_wide_slice(update.reboot_msg)
             .map_err(|_| Error::ServiceActionFailuresRebootMessageHasNulByte)?;
         let mut command = to_wide_slice(update.command)
             .map_err(|_| Error::ServiceActionFailuresCommandHasNulByte)?;
-        let mut sc_actions: Option<Vec<winsvc::SC_ACTION>> = update
+        let mut sc_actions: Option<Vec<Services::SC_ACTION>> = update
             .actions
             .map(|actions| actions.iter().map(ServiceAction::to_raw).collect());
 
@@ -1643,7 +1655,7 @@ impl Service {
 
         unsafe {
             self.change_config2(
-                winsvc::SERVICE_CONFIG_FAILURE_ACTIONS,
+                Services::SERVICE_CONFIG_FAILURE_ACTIONS,
                 &mut raw_failure_actions,
             )
             .map_err(Error::Winapi)
@@ -1656,21 +1668,24 @@ impl Service {
     pub fn set_description(&self, description: impl AsRef<OsStr>) -> crate::Result<()> {
         let wide_str = WideCString::from_os_str(description)
             .map_err(|_| Error::ServiceDescriptionHasNulByte)?;
-        let mut service_description = winsvc::SERVICE_DESCRIPTIONW {
+        let mut service_description = Services::SERVICE_DESCRIPTIONW {
             lpDescription: wide_str.as_ptr() as *mut _,
         };
 
         unsafe {
-            self.change_config2(winsvc::SERVICE_CONFIG_DESCRIPTION, &mut service_description)
-                .map_err(Error::Winapi)
+            self.change_config2(
+                Services::SERVICE_CONFIG_DESCRIPTION,
+                &mut service_description,
+            )
+            .map_err(Error::Winapi)
         }
     }
 
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
-        let mut raw_status = unsafe { mem::zeroed::<winsvc::SERVICE_STATUS>() };
+        let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS>() };
         let success = unsafe {
-            winsvc::ControlService(
+            Services::ControlService(
                 self.service_handle.raw_handle(),
                 command.raw_service_control_type(),
                 &mut raw_status,
@@ -1685,10 +1700,10 @@ impl Service {
     }
 
     /// Private helper to query the optional configuration parameters of windows services.
-    unsafe fn query_config2<T: Copy>(&self, kind: DWORD, data: &mut [u8]) -> io::Result<T> {
+    unsafe fn query_config2<T: Copy>(&self, kind: u32, data: &mut [u8]) -> io::Result<T> {
         let mut bytes_written: u32 = 0;
 
-        let success = winsvc::QueryServiceConfig2W(
+        let success = Services::QueryServiceConfig2W(
             self.service_handle.raw_handle(),
             kind,
             data.as_mut_ptr() as _,
@@ -1704,8 +1719,8 @@ impl Service {
     }
 
     /// Private helper to update the optional configuration parameters of windows services.
-    unsafe fn change_config2<T>(&self, kind: DWORD, data: &mut T) -> io::Result<()> {
-        let success = winsvc::ChangeServiceConfig2W(
+    unsafe fn change_config2<T>(&self, kind: u32, data: &mut T) -> io::Result<()> {
+        let success = Services::ChangeServiceConfig2W(
             self.service_handle.raw_handle(),
             kind,
             data as *mut _ as *mut _,
@@ -1746,17 +1761,17 @@ pub enum ParseRawError {
 fn string_from_guid(guid: &GUID) -> String {
     format!(
         "{:8X}-{:4X}-{:4X}-{:2X}{:2X}-{:2X}{:2X}{:2X}{:2X}{:2X}{:2X}",
-        guid.Data1,
-        guid.Data2,
-        guid.Data3,
-        guid.Data4[0],
-        guid.Data4[1],
-        guid.Data4[2],
-        guid.Data4[3],
-        guid.Data4[4],
-        guid.Data4[5],
-        guid.Data4[6],
-        guid.Data4[7]
+        guid.data1,
+        guid.data2,
+        guid.data3,
+        guid.data4[0],
+        guid.data4[1],
+        guid.data4[2],
+        guid.data4[3],
+        guid.data4[4],
+        guid.data4[5],
+        guid.data4[6],
+        guid.data4[7]
     )
 }
 
