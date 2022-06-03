@@ -2,25 +2,27 @@ use std::ffi::OsStr;
 use std::io;
 use std::os::raw::c_void;
 use widestring::WideCString;
-use winapi::shared::winerror::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR};
-use winapi::um::winsvc;
+use windows_sys::Win32::{
+    Foundation::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR},
+    System::Services,
+};
 
 use crate::service::{ServiceControl, ServiceStatus};
 use crate::{Error, Result};
 
 /// A struct that holds a unique token for updating the status of the corresponding service.
 #[derive(Debug, Clone, Copy)]
-pub struct ServiceStatusHandle(winsvc::SERVICE_STATUS_HANDLE);
+pub struct ServiceStatusHandle(Services::SERVICE_STATUS_HANDLE);
 
 impl ServiceStatusHandle {
-    fn from_handle(handle: winsvc::SERVICE_STATUS_HANDLE) -> Self {
+    fn from_handle(handle: Services::SERVICE_STATUS_HANDLE) -> Self {
         ServiceStatusHandle(handle)
     }
 
     /// Report the new service status to the system.
     pub fn set_service_status(&self, service_status: ServiceStatus) -> crate::Result<()> {
-        let mut raw_service_status = service_status.to_raw();
-        let result = unsafe { winsvc::SetServiceStatus(self.0, &mut raw_service_status) };
+        let raw_service_status = service_status.to_raw();
+        let result = unsafe { Services::SetServiceStatus(self.0, &raw_service_status) };
         if result == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
@@ -106,14 +108,14 @@ where
     let service_name =
         WideCString::from_os_str(service_name).map_err(|_| Error::ServiceNameHasNulByte)?;
     let status_handle = unsafe {
-        winsvc::RegisterServiceCtrlHandlerExW(
+        Services::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),
             Some(service_control_handler::<F>),
             context as *mut c_void,
         )
     };
 
-    if status_handle.is_null() {
+    if status_handle == 0 {
         // Release the `event_handler` in case of an error.
         let _: Box<F> = unsafe { Box::from_raw(context) };
         Err(Error::Winapi(io::Error::last_os_error()))

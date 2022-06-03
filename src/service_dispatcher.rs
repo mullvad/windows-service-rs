@@ -2,7 +2,7 @@ use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
 use widestring::{WideCStr, WideCString};
-use winapi::um::winsvc;
+use windows_sys::Win32::System::Services;
 
 use crate::{Error, Result};
 
@@ -93,19 +93,19 @@ pub fn start(
 ) -> Result<()> {
     let service_name =
         WideCString::from_os_str(service_name).map_err(|_| Error::ServiceNameHasNulByte)?;
-    let service_table: &[winsvc::SERVICE_TABLE_ENTRYW] = &[
-        winsvc::SERVICE_TABLE_ENTRYW {
-            lpServiceName: service_name.as_ptr(),
+    let service_table: &[Services::SERVICE_TABLE_ENTRYW] = &[
+        Services::SERVICE_TABLE_ENTRYW {
+            lpServiceName: service_name.as_ptr() as _,
             lpServiceProc: Some(service_main),
         },
         // the last item has to be { null, null }
-        winsvc::SERVICE_TABLE_ENTRYW {
-            lpServiceName: ptr::null(),
+        Services::SERVICE_TABLE_ENTRYW {
+            lpServiceName: ptr::null_mut(),
             lpServiceProc: None,
         },
     ];
 
-    let result = unsafe { winsvc::StartServiceCtrlDispatcherW(service_table.as_ptr()) };
+    let result = unsafe { Services::StartServiceCtrlDispatcherW(service_table.as_ptr()) };
     if result == 0 {
         Err(Error::Winapi(io::Error::last_os_error()))
     } else {

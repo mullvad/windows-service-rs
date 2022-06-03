@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Breaking: Change `winapi` dependency to `windows-sys`. This is a breaking change since some of the low level Windows types are exposed in the public API of this library.
 
 
 ## [0.4.0] - 2021-08-12

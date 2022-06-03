@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::{io, ptr};
 
 use widestring::WideCString;
-use winapi::um::winsvc;
+use windows_sys::Win32::System::Services;
 
 use crate::sc_handle::ScHandle;
 use crate::service::{to_wide, RawServiceInfo, Service, ServiceAccess, ServiceInfo};
@@ -12,13 +12,13 @@ bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
     pub struct ServiceManagerAccess: u32 {
         /// Can connect to service control manager.
-        const CONNECT = winsvc::SC_MANAGER_CONNECT;
+        const CONNECT = Services::SC_MANAGER_CONNECT;
 
         /// Can create services.
-        const CREATE_SERVICE = winsvc::SC_MANAGER_CREATE_SERVICE;
+        const CREATE_SERVICE = Services::SC_MANAGER_CREATE_SERVICE;
 
         /// Can enumerate services or receive notifications.
-        const ENUMERATE_SERVICE = winsvc::SC_MANAGER_ENUMERATE_SERVICE;
+        const ENUMERATE_SERVICE = Services::SC_MANAGER_ENUMERATE_SERVICE;
     }
 }
 
@@ -43,14 +43,14 @@ impl ServiceManager {
         let machine_name = to_wide(machine).map_err(|_| Error::MachineNameHasNulByte)?;
         let database_name = to_wide(database).map_err(|_| Error::DatabaseNameHasNulByte)?;
         let handle = unsafe {
-            winsvc::OpenSCManagerW(
+            Services::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
                 database_name.map_or(ptr::null(), |s| s.as_ptr()),
                 request_access.bits(),
             )
         };
 
-        if handle.is_null() {
+        if handle == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(ServiceManager {
@@ -135,7 +135,7 @@ impl ServiceManager {
     ) -> Result<Service> {
         let raw_info = RawServiceInfo::new(service_info)?;
         let service_handle = unsafe {
-            winsvc::CreateServiceW(
+            Services::CreateServiceW(
                 self.manager_handle.raw_handle(),
                 raw_info.name.as_ptr(),
                 raw_info.display_name.as_ptr(),
@@ -161,7 +161,7 @@ impl ServiceManager {
             )
         };
 
-        if service_handle.is_null() {
+        if service_handle == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
@@ -195,14 +195,14 @@ impl ServiceManager {
         let service_name =
             WideCString::from_os_str(name).map_err(|_| Error::ServiceNameHasNulByte)?;
         let service_handle = unsafe {
-            winsvc::OpenServiceW(
+            Services::OpenServiceW(
                 self.manager_handle.raw_handle(),
                 service_name.as_ptr(),
                 request_access.bits(),
             )
         };
 
-        if service_handle.is_null() {
+        if service_handle == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
