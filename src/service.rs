@@ -191,7 +191,7 @@ impl ServiceActionType {
             x if x == ServiceActionType::Reboot.to_raw() => Ok(ServiceActionType::Reboot),
             x if x == ServiceActionType::Restart.to_raw() => Ok(ServiceActionType::Restart),
             x if x == ServiceActionType::RunCommand.to_raw() => Ok(ServiceActionType::RunCommand),
-            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
+            _ => Err(ParseRawError::InvalidIntegerSigned(raw)),
         }
     }
 }
@@ -594,7 +594,7 @@ impl PowerSource {
             x if x == PowerSource::Ac.to_raw() => Ok(PowerSource::Ac),
             x if x == PowerSource::Dc.to_raw() => Ok(PowerSource::Dc),
             x if x == PowerSource::Hot.to_raw() => Ok(PowerSource::Hot),
-            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
+            _ => Err(ParseRawError::InvalidIntegerSigned(raw)),
         }
     }
 }
@@ -619,7 +619,7 @@ impl DisplayState {
             x if x == DisplayState::Off.to_raw() => Ok(DisplayState::Off),
             x if x == DisplayState::On.to_raw() => Ok(DisplayState::On),
             x if x == DisplayState::Dimmed.to_raw() => Ok(DisplayState::Dimmed),
-            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
+            _ => Err(ParseRawError::InvalidIntegerSigned(raw)),
         }
     }
 }
@@ -643,7 +643,7 @@ impl UserStatus {
         match raw {
             x if x == UserStatus::Present.to_raw() => Ok(UserStatus::Present),
             x if x == UserStatus::Inactive.to_raw() => Ok(UserStatus::Inactive),
-            _ => Err(ParseRawError::InvalidInteger(raw as u32)),
+            _ => Err(ParseRawError::InvalidIntegerSigned(raw)),
         }
     }
 }
@@ -694,6 +694,7 @@ impl BatterySaverState {
     }
 }
 
+// FIXME: Remove this function if microsoft/windows-rs#1798 gets merged and published.
 fn is_equal_guid(a: &GUID, b: &GUID) -> bool {
     a.data1 == b.data1 && a.data2 == b.data2 && a.data3 == b.data3 && a.data4 == b.data4
 }
@@ -1753,6 +1754,9 @@ fn to_wide_slice(
 pub enum ParseRawError {
     #[error(display = "Invalid integer value for the target type: {}", _0)]
     InvalidInteger(u32),
+
+    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    InvalidIntegerSigned(i32),
 
     #[error(display = "Invalid GUID value for the target type: {}", _0)]
     InvalidGuid(String),
