@@ -40,7 +40,6 @@ impl AsRawHandle for ServiceStatusHandle {
 }
 
 
-
 // Underlying SERVICE_STATUS_HANDLE is thread safe.
 // See remarks section for more info:
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ms686241(v=vs.85).aspx
