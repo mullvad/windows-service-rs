@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::io;
 use std::os::raw::c_void;
-use std::os::windows::prelude::{RawHandle, AsRawHandle};
+use std::os::windows::io::{AsRawHandle, RawHandle};
 use widestring::WideCString;
 use windows_sys::Win32::{
     Foundation::{ERROR_CALL_NOT_IMPLEMENTED, NO_ERROR},
