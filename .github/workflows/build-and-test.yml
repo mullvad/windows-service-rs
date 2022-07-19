@@ -1,0 +1,51 @@
+name: Cargo build and test
+on: [pull_request, workflow_dispatch]
+jobs:
+  test:
+    strategy:
+      matrix:
+        target:
+          - i686-pc-windows-gnu
+          - x86_64-pc-windows-gnu
+          - i686-pc-windows-msvc
+          - x86_64-pc-windows-msvc
+        rust: [stable]
+        include:
+          # Attach the platform data for MinGW to the -gnu targets
+          - target: i686-pc-windows-gnu
+            platform: x86
+          - target: x86_64-pc-windows-gnu
+            platform: x64
+          # Test more Rust channels on x86_64 msvc
+          - target: x86_64-pc-windows-msvc
+            rust: beta
+          - target: x86_64-pc-windows-msvc
+            rust: nightly
+          - target: x86_64-pc-windows-msvc
+            rust: 1.58.0
+
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up MinGW
+        if: matrix.target == 'i686-pc-windows-gnu' || matrix.target == 'x86_64-pc-windows-gnu'
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: ${{ matrix.platform }}
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          profile: minimal
+          default: true
+
+      - name: Build and test
+        shell: bash
+        run: |
+          set -x
+          export RUSTFLAGS="--deny warnings"
+          cargo build --verbose --target ${{ matrix.target }}
+          cargo test --target ${{ matrix.target }}
