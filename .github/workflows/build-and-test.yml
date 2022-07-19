@@ -1,0 +1,29 @@
+name: Cargo build and test
+on: [pull_request, workflow_dispatch]
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+          - 1.58.0
+
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: ${{ matrix.rust }}
+          profile: minimal
+          default: true
+
+      - name: Build and test
+        shell: bash
+        run: |
+          export RUSTFLAGS="--deny warnings"
+          cargo build
+          cargo test
