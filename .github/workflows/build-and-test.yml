@@ -9,8 +9,8 @@ jobs:
           - x86_64-pc-windows-gnu
           - i686-pc-windows-msvc
           - x86_64-pc-windows-msvc
+        rust: [stable]
         include:
-          - rust: stable
           - target: x86_64-pc-windows-msvc
             rust: beta
           - target: x86_64-pc-windows-msvc
@@ -34,5 +34,5 @@ jobs:
         shell: bash
         run: |
           export RUSTFLAGS="--deny warnings"
-          cargo build --verbose
-          cargo test
+          cargo build --verbose --target ${{ matrix.target }}
+          cargo test --target ${{ matrix.target }}
