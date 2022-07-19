@@ -294,8 +294,14 @@ impl ServiceFailureActions {
     ///
     /// # Errors
     ///
-    /// Returns an error if a field inside the `SERVICE_FAILURE_ACTIONSW` does not have a valid
-    /// value.
+    /// Returns an error if any of the `SC_ACTION`s pointed to by `lpsaActions` does not
+    /// successfully convert into a [`ServiceAction`].
+    ///
+    /// # Safety
+    ///
+    /// The `SERVICE_FAILURE_ACTIONSW` fields `lpRebootMsg`, `lpCommand` must be either null
+    /// or proper null terminated wide C strings.
+    /// `lpsaActions` must be either null or an array with `cActions` number of of `SC_ACTION`s.
     pub unsafe fn from_raw(
         raw: Services::SERVICE_FAILURE_ACTIONSW,
     ) -> crate::Result<ServiceFailureActions> {
