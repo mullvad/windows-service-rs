@@ -1,5 +1,5 @@
 use std::ffi::{OsStr, OsString};
-use widestring::{NulError, WideCStr, WideCString, WideString};
+use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
 use windows_sys::core::PWSTR;
 
 /// A helper to join a collection of `OsStr` into a nul-separated `WideString` ending with two nul
@@ -12,7 +12,7 @@ use windows_sys::core::PWSTR;
 /// "item one\0item two\0\0"
 ///
 /// Returns None if the source collection is empty.
-pub fn from_vec(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, NulError<u16>> {
+pub fn from_vec(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, ContainsNul<u16>> {
     if source.is_empty() {
         Ok(None)
     } else {
