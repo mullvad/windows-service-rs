@@ -1558,14 +1558,7 @@ impl Service {
             self.query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
                 .map_err(Error::Winapi)?
         };
-
-        let result = if raw_failure_actions_flag.fFailureActionsOnNonCrashFailures == 0 {
-            false
-        } else {
-            true
-        };
-
-        Ok(result)
+        Ok(raw_failure_actions_flag.fFailureActionsOnNonCrashFailures != 0)
     }
 
     pub fn set_config_service_sid_info(
