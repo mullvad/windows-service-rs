@@ -1115,8 +1115,8 @@ impl ServiceState {
         }
     }
 
-    fn to_raw(&self) -> u32 {
-        *self as u32
+    fn to_raw(self) -> u32 {
+        self as u32
     }
 }
 
