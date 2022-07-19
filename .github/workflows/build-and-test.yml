@@ -4,11 +4,19 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        rust:
-          - stable
-          - beta
-          - nightly
-          - 1.58.0
+        target:
+          - i686-pc-windows-gnu
+          - x86_64-pc-windows-gnu
+          - i686-pc-windows-msvc
+          - x86_64-pc-windows-msvc
+        include:
+          - rust: stable
+          - target: x86_64-pc-windows-msvc
+            rust: beta
+          - target: x86_64-pc-windows-msvc
+            rust: nightly
+          - target: x86_64-pc-windows-msvc
+            rust: 1.58.0
 
     runs-on: windows-latest
     steps:
@@ -18,6 +26,7 @@ jobs:
         uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
           profile: minimal
           default: true
 
@@ -25,5 +34,5 @@ jobs:
         shell: bash
         run: |
           export RUSTFLAGS="--deny warnings"
-          cargo build
+          cargo build --verbose
           cargo test
