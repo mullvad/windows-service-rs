@@ -452,14 +452,14 @@ impl RawServiceInfo {
 
         Ok(Self {
             name: service_name,
-            display_name: display_name,
+            display_name,
             service_type: service_info.service_type.bits(),
             start_type: service_info.start_type.to_raw(),
             error_control: service_info.error_control.to_raw(),
-            launch_command: launch_command,
+            launch_command,
             dependencies: joined_dependencies,
-            account_name: account_name,
-            account_password: account_password,
+            account_name,
+            account_password,
         })
     }
 }
