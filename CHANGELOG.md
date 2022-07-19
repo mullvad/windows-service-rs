@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - Breaking: Change `winapi` dependency to `windows-sys`. This is a breaking change since some of the low level Windows types are exposed in the public API of this library.
-- Breaking: Update `widestring` dependency from version 0.5.1 to 1. This is a breaking change since `NulError` (now `widestring::error::ContainsNul`) is exposed in the public API of this library.
+- Breaking: Update `widestring` dependency to 1.0 and remove it from the public API.
 
 
 ## [0.4.0] - 2021-08-12
