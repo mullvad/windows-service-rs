@@ -511,7 +511,17 @@ impl ServiceConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if a field inside the `QUERY_SERVICE_CONFIGW` does not have a valid value.
+    /// Returns an error if `dwStartType` does not successfully convert into a
+    /// [`ServiceStartType`], or `dwErrorControl` does not successfully convert
+    /// into a [`ServiceErrorControl`].
+    ///
+    /// # Safety
+    ///
+    /// `lpDependencies` must contain a wide string where each dependency is delimited with a NUL
+    /// and the entire string ends in two NULs.
+    ///
+    /// `lpLoadOrderGroup`, `lpServiceStartName`, `lpBinaryPathName` and `lpDisplayName` must be
+    /// either null or proper null terminated wide C strings.
     pub unsafe fn from_raw(raw: Services::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
