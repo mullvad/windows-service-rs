@@ -5,7 +5,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+
+## [0.5.0] - 2022-07-20
+### Added
+- Implement `AsRawHandle` for `ServiceStatusHandle`. Allows using the service handles
+  with other Windows APIs, not covered by this crate.
+
 ### Changed
+- Upgrade the crate to Rust 2021 edition and bump the MSRV to 1.58.0
 - Breaking: Change `winapi` dependency to `windows-sys`. This is a breaking change since
   some of the low level Windows types are exposed in the public API of this library.
 - Breaking: Update `widestring` dependency to 1.0 and remove it from the public API.
