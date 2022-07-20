@@ -1,0 +1,16 @@
+name: Audit Rust dependencies
+on: [pull_request, workflow_dispatch]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install cargo-audit
+        uses: actions-rs/install@v0.1.2
+        with:
+          crate: cargo-audit
+          version: latest
+
+      - name: Audit
+        run: cargo audit

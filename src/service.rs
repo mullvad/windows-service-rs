@@ -294,8 +294,14 @@ impl ServiceFailureActions {
     ///
     /// # Errors
     ///
-    /// Returns an error if a field inside the `SERVICE_FAILURE_ACTIONSW` does not have a valid
-    /// value.
+    /// Returns an error if any of the `SC_ACTION`s pointed to by `lpsaActions` does not
+    /// successfully convert into a [`ServiceAction`].
+    ///
+    /// # Safety
+    ///
+    /// The `SERVICE_FAILURE_ACTIONSW` fields `lpRebootMsg`, `lpCommand` must be either null
+    /// or proper null terminated wide C strings.
+    /// `lpsaActions` must be either null or an array with `cActions` number of of `SC_ACTION`s.
     pub unsafe fn from_raw(
         raw: Services::SERVICE_FAILURE_ACTIONSW,
     ) -> crate::Result<ServiceFailureActions> {
@@ -452,14 +458,14 @@ impl RawServiceInfo {
 
         Ok(Self {
             name: service_name,
-            display_name: display_name,
+            display_name,
             service_type: service_info.service_type.bits(),
             start_type: service_info.start_type.to_raw(),
             error_control: service_info.error_control.to_raw(),
-            launch_command: launch_command,
+            launch_command,
             dependencies: joined_dependencies,
-            account_name: account_name,
-            account_password: account_password,
+            account_name,
+            account_password,
         })
     }
 }
@@ -505,7 +511,17 @@ impl ServiceConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if a field inside the `QUERY_SERVICE_CONFIGW` does not have a valid value.
+    /// Returns an error if `dwStartType` does not successfully convert into a
+    /// [`ServiceStartType`], or `dwErrorControl` does not successfully convert
+    /// into a [`ServiceErrorControl`].
+    ///
+    /// # Safety
+    ///
+    /// `lpDependencies` must contain a wide string where each dependency is delimited with a NUL
+    /// and the entire string ends in two NULs.
+    ///
+    /// `lpLoadOrderGroup`, `lpServiceStartName`, `lpBinaryPathName` and `lpDisplayName` must be
+    /// either null or proper null terminated wide C strings.
     pub unsafe fn from_raw(raw: Services::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
         let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
@@ -1099,8 +1115,8 @@ impl ServiceState {
         }
     }
 
-    fn to_raw(&self) -> u32 {
-        *self as u32
+    fn to_raw(self) -> u32 {
+        self as u32
     }
 }
 
@@ -1542,14 +1558,7 @@ impl Service {
             self.query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
                 .map_err(Error::Winapi)?
         };
-
-        let result = if raw_failure_actions_flag.fFailureActionsOnNonCrashFailures == 0 {
-            false
-        } else {
-            true
-        };
-
-        Ok(result)
+        Ok(raw_failure_actions_flag.fFailureActionsOnNonCrashFailures != 0)
     }
 
     pub fn set_config_service_sid_info(
