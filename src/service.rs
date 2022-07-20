@@ -1376,7 +1376,7 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start(&self, service_arguments: &[impl AsRef<OsStr>]) -> crate::Result<()> {
+    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> crate::Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
             .map(|s| WideCString::from_os_str(s).map_err(|_| Error::StartArgumentHasNulByte))
