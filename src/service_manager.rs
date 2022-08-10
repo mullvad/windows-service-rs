@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
 use widestring::WideCString;
@@ -206,6 +206,30 @@ impl ServiceManager {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
+        }
+    }
+
+    /// Retrieves the service name of the specified service.
+    pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
+        let service_display_name =
+            WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
+        let mut size = 4u32 * 1024;
+        let mut buffer = vec![0u16; size as usize];
+        let result = unsafe {
+            Services::GetServiceKeyNameW(
+                self.manager_handle.raw_handle(),
+                service_display_name.as_ptr(),
+                buffer.as_mut_ptr(),
+                &mut size as _,
+            )
+        };
+
+        if result == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            let service_name = WideCString::from_vec(&buffer[..size as usize])
+                .map_err(|_| Error::ServiceNameHasNulByte)?;
+            Ok(service_name.to_os_string())
         }
     }
 }
