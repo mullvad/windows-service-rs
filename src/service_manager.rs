@@ -1,7 +1,8 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
 use widestring::WideCString;
+use windows_sys::Win32::Foundation::{GetLastError, ERROR_INSUFFICIENT_BUFFER};
 use windows_sys::Win32::System::Services;
 
 use crate::sc_handle::ScHandle;
@@ -206,6 +207,43 @@ impl ServiceManager {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
+        }
+    }
+
+    /// Retrieves the service name of the specified service.
+    pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
+        let service_display_name =
+            WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
+        let mut size = 0u32;
+        let res = unsafe {
+            Services::GetServiceKeyNameW(
+                self.manager_handle.raw_handle(),
+                service_display_name.as_ptr(),
+                std::ptr::null_mut(),
+                &mut size as _,
+            )
+        };
+
+        if res == 0 && unsafe { GetLastError() } != ERROR_INSUFFICIENT_BUFFER {
+            return Err(Error::Winapi(io::Error::last_os_error()));
+        }
+
+        let mut buffer = vec![0u16; size as usize];
+        let res = unsafe {
+            Services::GetServiceKeyNameW(
+                self.manager_handle.raw_handle(),
+                service_display_name.as_ptr(),
+                buffer.as_mut_ptr(),
+                &mut size as _,
+            )
+        };
+
+        if res == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            let service_name =
+                WideCString::from_vec(buffer).map_err(|_| Error::ServiceNameHasNulByte)?;
+            Ok(service_name.to_os_string())
         }
     }
 }
