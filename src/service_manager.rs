@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::{io, ptr};
 
 use widestring::WideCString;
@@ -208,6 +208,47 @@ impl ServiceManager {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
+        }
+    }
+
+    /// Search the service name associated with a service display name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A service display name.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service_name = manager.get_service_key_name("My Service Display Name")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
+        let service_display_name =
+            WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
+        // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k
+        let mut size = 4u32 * 1024;
+        let mut buffer = vec![0u16; size as usize];
+        let result = unsafe {
+            Services::GetServiceKeyNameW(
+                self.manager_handle.raw_handle(),
+                service_display_name.as_ptr(),
+                buffer.as_mut_ptr(),
+                &mut size as _,
+            )
+        };
+
+        if result == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            let service_name = WideCString::from_vec(&buffer[..size as usize])
+                .map_err(|_| Error::ServiceNameHasNulByte)?;
+            Ok(service_name.to_os_string())
         }
     }
 }
