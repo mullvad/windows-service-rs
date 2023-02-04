@@ -178,84 +178,83 @@
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(err_derive::Error, Debug)]
-#[error(no_from)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Account name contains a nul byte.
-    #[error(display = "Account name contains a nul byte")]
+    #[error("Account name contains a nul byte")]
     AccountNameHasNulByte,
 
     /// Account password contains a nul byte.
-    #[error(display = "Account password contains a nul byte")]
+    #[error("Account password contains a nul byte")]
     AccountPasswordHasNulByte,
 
     /// Display name contains a nul byte.
-    #[error(display = "Display name contains a nul byte")]
+    #[error("Display name contains a nul byte")]
     DisplayNameHasNulByte,
 
     /// Database name contains a nul byte.
-    #[error(display = "Database name contains a nul byte")]
+    #[error("Database name contains a nul byte")]
     DatabaseNameHasNulByte,
 
     /// Executable path contains a nul byte.
-    #[error(display = "Executable path contains a nul byte")]
+    #[error("Executable path contains a nul byte")]
     ExecutablePathHasNulByte,
 
     /// Launch arguments contains a nul byte.
-    #[error(display = "Launch argument at index {} contains a nul byte", _0)]
+    #[error("Launch argument at index {0} contains a nul byte")]
     LaunchArgumentHasNulByte(usize),
 
     /// Launch arguments are not supported for kernel drivers.
-    #[error(display = "Kernel drivers do not support launch arguments")]
+    #[error("Kernel drivers do not support launch arguments")]
     LaunchArgumentsNotSupported,
 
     /// Dependency name contains a nul byte.
-    #[error(display = "Dependency name contains a nul byte")]
+    #[error("Dependency name contains a nul byte")]
     DependencyHasNulByte,
 
     /// Machine name contains a nul byte.
-    #[error(display = "Machine name contains a nul byte")]
+    #[error("Machine name contains a nul byte")]
     MachineNameHasNulByte,
 
     /// Service name contains a nul byte.
-    #[error(display = "Service name contains a nul byte")]
+    #[error("Service name contains a nul byte")]
     ServiceNameHasNulByte,
 
     /// Start argument contains a nul byte.
-    #[error(display = "Start argument contains a nul byte")]
+    #[error("Start argument contains a nul byte")]
     StartArgumentHasNulByte,
 
     /// Invalid raw representation of [`ServiceState`](service::ServiceState).
-    #[error(display = "Invalid service state value")]
-    InvalidServiceState(#[error(source)] service::ParseRawError),
+    #[error("Invalid service state value")]
+    InvalidServiceState(#[source] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceStartType`](service::ServiceStartType).
-    #[error(display = "Invalid service start value")]
-    InvalidServiceStartType(#[error(source)] service::ParseRawError),
+    #[error("Invalid service start value")]
+    InvalidServiceStartType(#[source] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceErrorControl`](service::ServiceErrorControl).
-    #[error(display = "Invalid service error control value")]
-    InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
+    #[error("Invalid service error control value")]
+    InvalidServiceErrorControl(#[source] service::ParseRawError),
 
     /// Invalid raw representation of [`ServiceActionType`](service::ServiceActionType).
-    #[error(display = "Invalid service action type")]
-    InvalidServiceActionType(#[error(source)] service::ParseRawError),
+    #[error("Invalid service action type")]
+    InvalidServiceActionType(#[source] service::ParseRawError),
 
     /// Reboot message contains a nul byte.
-    #[error(display = "Service action failures reboot message contains a nul byte")]
+    #[error("Service action failures reboot message contains a nul byte")]
     ServiceActionFailuresRebootMessageHasNulByte,
 
     /// Command contains a nul byte.
-    #[error(display = "Service action failures command contains a nul byte")]
+    #[error("Service action failures command contains a nul byte")]
     ServiceActionFailuresCommandHasNulByte,
 
     /// Service description contains a nul byte.
-    #[error(display = "Service description contains a nul byte")]
+    #[error("Service description contains a nul byte")]
     ServiceDescriptionHasNulByte,
 
-    /// IO error when calling winapi
-    #[error(display = "IO error in winapi call")]
-    Winapi(#[error(source)] std::io::Error),
+    /// IO error when calling win32 API
+    #[error("IO error in win32 API call")]
+    Winapi(#[source] std::io::Error),
 }
 
 impl Error {

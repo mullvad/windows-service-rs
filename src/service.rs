@@ -1766,15 +1766,15 @@ fn to_wide_slice(
     }
 }
 
-#[derive(err_derive::Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ParseRawError {
-    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    #[error("Invalid integer value for the target type: {0}")]
     InvalidInteger(u32),
 
-    #[error(display = "Invalid integer value for the target type: {}", _0)]
+    #[error("Invalid integer value for the target type: {0}")]
     InvalidIntegerSigned(i32),
 
-    #[error(display = "Invalid GUID value for the target type: {}", _0)]
+    #[error("Invalid GUID value for the target type: {0}")]
     InvalidGuid(String),
 }
 
