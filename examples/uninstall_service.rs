@@ -24,10 +24,8 @@ fn main() -> windows_service::Result<()> {
     drop(service);
 
     // Check if the service is deleted.
-    if let Err(windows_service::Error::Winapi(e)) =
-        service_manager.open_service("ping_service", ServiceAccess::QUERY_STATUS)
-    {
-        if e.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) {
+    if let Err(e) = service_manager.open_service("ping_service", ServiceAccess::QUERY_STATUS) {
+        if e.is_os_error(ERROR_SERVICE_DOES_NOT_EXIST as i32) {
             println!("ping_service is deleted.")
         }
     }
