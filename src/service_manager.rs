@@ -100,8 +100,8 @@ impl ServiceManager {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use std::ffi::OsString;
-    /// use std::path::PathBuf;
+    /// use std::ffi::OsStr;
+    /// use std::path::Path;
     /// use windows_service::service::{
     ///     ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType,
     /// };
@@ -111,15 +111,15 @@ impl ServiceManager {
     ///     let manager =
     ///         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE)?;
     ///
-    ///     let my_service_info = ServiceInfo {
-    ///         name: OsString::from("my_service"),
-    ///         display_name: OsString::from("My service"),
+    ///     let my_service_info: ServiceInfo<&OsStr> = ServiceInfo {
+    ///         name: OsStr::new("my_service"),
+    ///         display_name: OsStr::new("My service"),
     ///         service_type: ServiceType::OWN_PROCESS,
     ///         start_type: ServiceStartType::OnDemand,
     ///         error_control: ServiceErrorControl::Normal,
-    ///         executable_path: PathBuf::from(r"C:\path\to\my\service.exe"),
-    ///         launch_arguments: vec![],
-    ///         dependencies: vec![],
+    ///         executable_path: Path::new(r"C:\path\to\my\service.exe"),
+    ///         launch_arguments: &[],
+    ///         dependencies: &[],
     ///         account_name: None, // run as System
     ///         account_password: None,
     ///     };
@@ -128,9 +128,9 @@ impl ServiceManager {
     ///     Ok(())
     /// }
     /// ```
-    pub fn create_service(
+    pub fn create_service<T: AsRef<OsStr>>(
         &self,
-        service_info: &ServiceInfo,
+        service_info: &ServiceInfo<T>,
         service_access: ServiceAccess,
     ) -> Result<Service> {
         let raw_info = RawServiceInfo::new(service_info)?;

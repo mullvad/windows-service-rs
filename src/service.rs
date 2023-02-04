@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::ptr;
 use std::time::Duration;
 use std::{io, mem};
@@ -298,12 +298,12 @@ impl ServiceFailureActions {
 
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ServiceInfo {
+pub struct ServiceInfo<'a, T: AsRef<OsStr>> {
     /// Service name
-    pub name: OsString,
+    pub name: &'a OsStr,
 
     /// User-friendly service name
-    pub display_name: OsString,
+    pub display_name: &'a OsStr,
 
     /// The service type
     pub service_type: ServiceType,
@@ -315,11 +315,11 @@ pub struct ServiceInfo {
     pub error_control: ServiceErrorControl,
 
     /// Path to the service binary
-    pub executable_path: PathBuf,
+    pub executable_path: &'a Path,
 
     /// Launch arguments passed to `main` when system starts the service.
     /// This is not the same as arguments passed to `service_main`.
-    pub launch_arguments: Vec<OsString>,
+    pub launch_arguments: &'a [T],
 
     /// The names of services or load ordering groups that the system must start before this service.
     /// Specify an empty vector if the service has no dependencies.
@@ -328,7 +328,7 @@ pub struct ServiceInfo {
     /// running after an attempt to start all members of the group. You must prefix group names with
     /// '+' (SC_GROUP_IDENTIFIER) so that they can be distinguished from a service name, because services
     /// and service groups share the same name space.
-    pub dependencies: Vec<OsString>,
+    pub dependencies: &'a [T],
 
     /// Account to use for running the service.
     /// Specify `None` to run as LocalSystem.
@@ -336,11 +336,11 @@ pub struct ServiceInfo {
     /// Common system accounts:
     /// - `NT Authority\LocalService`
     /// - `NT Authority\NetworkService`
-    pub account_name: Option<OsString>,
+    pub account_name: Option<&'a OsStr>,
 
     /// Account password.
     /// For system accounts this should normally be `None`.
-    pub account_password: Option<OsString>,
+    pub account_password: Option<&'a OsStr>,
 }
 
 /// Same as `ServiceInfo` but with fields that are compatible with the Windows API.
@@ -386,15 +386,15 @@ pub(crate) struct RawServiceInfo {
 }
 
 impl RawServiceInfo {
-    pub fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
-        let service_name = WideCString::from_os_str(&service_info.name)
+    pub fn new<T: AsRef<OsStr>>(service_info: &ServiceInfo<T>) -> crate::Result<Self> {
+        let service_name = WideCString::from_os_str(service_info.name)
             .map_err(|_| Error::ServiceNameHasNulByte)?;
-        let display_name = WideCString::from_os_str(&service_info.display_name)
+        let display_name = WideCString::from_os_str(service_info.display_name)
             .map_err(|_| Error::DisplayNameHasNulByte)?;
-        let account_name = to_wide(service_info.account_name.as_ref())
-            .map_err(|_| Error::AccountNameHasNulByte)?;
-        let account_password = to_wide(service_info.account_password.as_ref())
-            .map_err(|_| Error::AccountPasswordHasNulByte)?;
+        let account_name =
+            to_wide(service_info.account_name).map_err(|_| Error::AccountNameHasNulByte)?;
+        let account_password =
+            to_wide(service_info.account_password).map_err(|_| Error::AccountPasswordHasNulByte)?;
 
         // escape executable path and arguments and combine them into a single command
         let mut launch_command_buffer = WideString::new();
@@ -408,11 +408,11 @@ impl RawServiceInfo {
             }
 
             // also the path must not be quoted even if it contains spaces
-            let executable_path = WideCString::from_os_str(&service_info.executable_path)
+            let executable_path = WideCString::from_os_str(service_info.executable_path)
                 .map_err(|_| Error::ExecutablePathHasNulByte)?;
             launch_command_buffer.push(executable_path.to_ustring());
         } else {
-            let executable_path = escape_wide(&service_info.executable_path)
+            let executable_path = escape_wide(service_info.executable_path)
                 .map_err(|_| Error::ExecutablePathHasNulByte)?;
             launch_command_buffer.push(executable_path);
 
@@ -427,7 +427,7 @@ impl RawServiceInfo {
 
         // Safety: We are sure launch_command_buffer does not contain nulls
         let launch_command = unsafe { WideCString::from_ustr_unchecked(launch_command_buffer) };
-        let dependencies = double_nul_terminated::from_slice(&service_info.dependencies)
+        let dependencies = double_nul_terminated::from_slice(service_info.dependencies)
             .map_err(|_| Error::DependencyHasNulByte)?;
 
         Ok(Self {
@@ -1478,7 +1478,10 @@ impl Service {
     /// any of the string arguments to indicate that they should not be updated.
     ///
     /// If we wanted to support this we wouldn't be able to reuse the `ServiceInfo` struct.
-    pub fn change_config(&self, service_info: &ServiceInfo) -> crate::Result<()> {
+    pub fn change_config<T: AsRef<OsStr>>(
+        &self,
+        service_info: &ServiceInfo<T>,
+    ) -> crate::Result<()> {
         let raw_info = RawServiceInfo::new(service_info)?;
         let success = unsafe {
             Services::ChangeServiceConfigW(

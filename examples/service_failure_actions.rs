@@ -1,6 +1,6 @@
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use std::ffi::OsString;
+    use std::ffi::{OsStr, OsString};
     use std::time::Duration;
     use windows_service::{
         service::{
@@ -20,15 +20,15 @@ fn main() -> windows_service::Result<()> {
         .unwrap()
         .with_file_name("service_failure_actions.exe");
 
-    let service_info = ServiceInfo {
-        name: OsString::from(SERVICE_NAME),
-        display_name: OsString::from("Service Failure Actions Example"),
+    let service_info: ServiceInfo<&OsStr> = ServiceInfo {
+        name: OsStr::new(SERVICE_NAME),
+        display_name: OsStr::new("Service Failure Actions Example"),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::OnDemand,
         error_control: ServiceErrorControl::Normal,
-        executable_path: service_binary_path,
-        launch_arguments: vec![],
-        dependencies: vec![],
+        executable_path: &service_binary_path,
+        launch_arguments: &[],
+        dependencies: &[],
         account_name: None, // run as System
         account_password: None,
     };
@@ -76,11 +76,9 @@ fn main() -> windows_service::Result<()> {
 
     println!("Query failure actions on non-crash failures enabled");
     let failure_actions_flag = service.get_failure_actions_on_non_crash_failures()?;
-    println!(
-        "Failure actions on non-crash failures enabled: {failure_actions_flag}"
-    );
+    println!("Failure actions on non-crash failures enabled: {failure_actions_flag}");
 
-    println!("Delete the service {SERVICE_NAME}");
+    println!("Mark the service {SERVICE_NAME} for deletion");
     service.delete()?;
 
     Ok(())

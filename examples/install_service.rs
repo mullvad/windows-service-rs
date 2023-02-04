@@ -1,6 +1,6 @@
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use std::ffi::OsString;
+    use std::ffi::OsStr;
     use windows_service::{
         service::{ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType},
         service_manager::{ServiceManager, ServiceManagerAccess},
@@ -16,15 +16,15 @@ fn main() -> windows_service::Result<()> {
         .unwrap()
         .with_file_name("ping_service.exe");
 
-    let service_info = ServiceInfo {
-        name: OsString::from("ping_service"),
-        display_name: OsString::from("Ping service"),
+    let service_info: ServiceInfo<&OsStr> = ServiceInfo {
+        name: OsStr::new("ping_service"),
+        display_name: OsStr::new("Ping service"),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::OnDemand,
         error_control: ServiceErrorControl::Normal,
-        executable_path: service_binary_path,
-        launch_arguments: vec![],
-        dependencies: vec![],
+        executable_path: &service_binary_path,
+        launch_arguments: &[],
+        dependencies: &[],
         account_name: None, // run as System
         account_password: None,
     };
