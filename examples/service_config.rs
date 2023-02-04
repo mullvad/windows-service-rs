@@ -14,7 +14,7 @@ fn main() -> windows_service::Result<()> {
     let service = service_manager.open_service(service_name, ServiceAccess::QUERY_CONFIG)?;
 
     let config = service.query_config()?;
-    println!("{:#?}", config);
+    println!("{config:#?}");
     Ok(())
 }
 

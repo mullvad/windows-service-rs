@@ -23,11 +23,11 @@ fn main() -> windows_service::Result<()> {
 
     let service = service_manager.open_service(&service_name, ServiceAccess::PAUSE_CONTINUE)?;
 
-    println!("Pause {}", service_name);
+    println!("Pause {service_name}");
     let paused_state = service.pause()?;
     println!("{:?}", paused_state.current_state);
 
-    println!("Resume {}", service_name);
+    println!("Resume {service_name}");
     let resumed_state = service.resume()?;
     println!("{:?}", resumed_state.current_state);
 

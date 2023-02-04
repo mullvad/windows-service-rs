@@ -38,7 +38,7 @@ fn main() -> windows_service::Result<()> {
         | ServiceAccess::START
         | ServiceAccess::DELETE;
 
-    println!("Create or open the service {}", SERVICE_NAME);
+    println!("Create or open the service {SERVICE_NAME}");
     let service = service_manager
         .create_service(&service_info, service_access)
         .or(service_manager.open_service(SERVICE_NAME, service_access))?;
@@ -69,7 +69,7 @@ fn main() -> windows_service::Result<()> {
 
     println!("Query failure actions");
     let updated_failure_actions = service.get_failure_actions()?;
-    println!("{:#?}", updated_failure_actions);
+    println!("{updated_failure_actions:#?}");
 
     println!("Enable failure actions on non-crash failures");
     service.set_failure_actions_on_non_crash_failures(true)?;
@@ -77,11 +77,10 @@ fn main() -> windows_service::Result<()> {
     println!("Query failure actions on non-crash failures enabled");
     let failure_actions_flag = service.get_failure_actions_on_non_crash_failures()?;
     println!(
-        "Failure actions on non-crash failures enabled: {}",
-        failure_actions_flag
+        "Failure actions on non-crash failures enabled: {failure_actions_flag}"
     );
 
-    println!("Delete the service {}", SERVICE_NAME);
+    println!("Delete the service {SERVICE_NAME}");
     service.delete()?;
 
     Ok(())
