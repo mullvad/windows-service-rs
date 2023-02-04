@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::ptr;
 use std::time::Duration;
@@ -129,44 +128,6 @@ impl ServiceErrorControl {
             x if x == ServiceErrorControl::Normal.to_raw() => Ok(ServiceErrorControl::Normal),
             x if x == ServiceErrorControl::Severe.to_raw() => Ok(ServiceErrorControl::Severe),
             _ => Err(ParseRawError::InvalidInteger(raw)),
-        }
-    }
-}
-
-/// Service dependency descriptor
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ServiceDependency {
-    Service(OsString),
-    Group(OsString),
-}
-
-impl ServiceDependency {
-    pub fn to_system_identifier(&self) -> OsString {
-        match *self {
-            ServiceDependency::Service(ref name) => name.to_owned(),
-            ServiceDependency::Group(ref name) => {
-                // since services and service groups share the same namespace the group identifiers
-                // should be prefixed with '+' (SC_GROUP_IDENTIFIER)
-                let mut group_identifier = OsString::new();
-                group_identifier.push("+");
-                group_identifier.push(name);
-                group_identifier
-            }
-        }
-    }
-
-    pub fn from_system_identifier(identifier: impl AsRef<OsStr>) -> Self {
-        let group_prefix: u16 = '+' as u16;
-        let mut iter = identifier.as_ref().encode_wide().peekable();
-
-        if iter.peek() == Some(&group_prefix) {
-            let chars: Vec<u16> = iter.skip(1).collect();
-            let group_name = OsString::from_wide(&chars);
-            ServiceDependency::Group(group_name)
-        } else {
-            let chars: Vec<u16> = iter.collect();
-            let service_name = OsString::from_wide(&chars);
-            ServiceDependency::Service(service_name)
         }
     }
 }
@@ -360,12 +321,21 @@ pub struct ServiceInfo {
     /// This is not the same as arguments passed to `service_main`.
     pub launch_arguments: Vec<OsString>,
 
-    /// Service dependencies
-    pub dependencies: Vec<ServiceDependency>,
+    /// The names of services or load ordering groups that the system must start before this service.
+    /// Specify an empty vector if the service has no dependencies.
+    ///
+    /// Dependency on a group means that this service can run if at least one member of the group is
+    /// running after an attempt to start all members of the group. You must prefix group names with
+    /// '+' (SC_GROUP_IDENTIFIER) so that they can be distinguished from a service name, because services
+    /// and service groups share the same name space.
+    pub dependencies: Vec<OsString>,
 
     /// Account to use for running the service.
-    /// for example: NT Authority\System.
-    /// use `None` to run as LocalSystem.
+    /// Specify `None` to run as LocalSystem.
+    ///
+    /// Common system accounts:
+    /// - `NT Authority\LocalService`
+    /// - `NT Authority\NetworkService`
     pub account_name: Option<OsString>,
 
     /// Account password.
@@ -393,12 +363,21 @@ pub(crate) struct RawServiceInfo {
     /// Path to the service binary with arguments appended
     pub launch_command: WideCString,
 
-    /// Service dependencies
+    /// The names of services or load ordering groups that the system must start before this service.
+    /// Specify None if the service has no dependencies.
+    ///
+    /// Dependency on a group means that this service can run if at least one member of the group is
+    /// running after an attempt to start all members of the group. You must prefix group names with
+    /// '+' (SC_GROUP_IDENTIFIER) so that they can be distinguished from a service name, because services
+    /// and service groups share the same name space.
     pub dependencies: Option<WideString>,
 
     /// Account to use for running the service.
-    /// for example: NT Authority\System.
-    /// use `None` to run as LocalSystem.
+    /// Specify `None` to run as LocalSystem.
+    ///
+    /// Common system accounts:
+    /// - `NT Authority\LocalService`
+    /// - `NT Authority\NetworkService`
     pub account_name: Option<WideCString>,
 
     /// Account password.
@@ -448,13 +427,7 @@ impl RawServiceInfo {
 
         // Safety: We are sure launch_command_buffer does not contain nulls
         let launch_command = unsafe { WideCString::from_ustr_unchecked(launch_command_buffer) };
-
-        let dependency_identifiers: Vec<OsString> = service_info
-            .dependencies
-            .iter()
-            .map(|dependency| dependency.to_system_identifier())
-            .collect();
-        let joined_dependencies = double_nul_terminated::from_slice(&dependency_identifiers)
+        let dependencies = double_nul_terminated::from_slice(&service_info.dependencies)
             .map_err(|_| Error::DependencyHasNulByte)?;
 
         Ok(Self {
@@ -464,7 +437,7 @@ impl RawServiceInfo {
             start_type: service_info.start_type.to_raw(),
             error_control: service_info.error_control.to_raw(),
             launch_command,
-            dependencies: joined_dependencies,
+            dependencies,
             account_name,
             account_password,
         })
@@ -493,14 +466,22 @@ pub struct ServiceConfig {
     /// parameter.
     pub tag_id: u32,
 
-    /// Service dependencies
-    pub dependencies: Vec<ServiceDependency>,
+    /// The names of services or load ordering groups that the system must start before this service.
+    /// It is empty if the service has no dependencies.
+    ///
+    /// Dependency on a group means that this service can run if at least one member of the group is
+    /// running after an attempt to start all members of the group. Group names are prefixed with '+'
+    /// (SC_GROUP_IDENTIFIER) so that they can be distinguished from a service name, because services
+    /// and service groups share the same name space.
+    ///
+    /// <https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-query_service_configw>
+    pub dependencies: Vec<OsString>,
 
     /// Account to use for running the service.
     /// for example: NT Authority\System.
     ///
     /// This value can be `None` in certain cases, please refer to MSDN for more info:\
-    /// <https://docs.microsoft.com/en-us/windows/desktop/api/winsvc/ns-winsvc-_query_service_configw>
+    /// <https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-query_service_configw>
     pub account_name: Option<OsString>,
 
     /// User-friendly service name
@@ -524,10 +505,7 @@ impl ServiceConfig {
     /// `lpLoadOrderGroup`, `lpServiceStartName`, `lpBinaryPathName` and `lpDisplayName` must be
     /// either null or proper null terminated wide C strings.
     pub unsafe fn from_raw(raw: Services::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
-        let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
-            .iter()
-            .map(ServiceDependency::from_system_identifier)
-            .collect();
+        let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies);
 
         let load_order_group = ptr::NonNull::new(raw.lpLoadOrderGroup).and_then(|wrapped_ptr| {
             let group = WideCStr::from_ptr_str(wrapped_ptr.as_ptr()).to_os_string();
@@ -1832,24 +1810,4 @@ fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, Contai
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_service_group_identifier() {
-        let dependency = ServiceDependency::from_system_identifier("+network");
-        assert_eq!(
-            dependency,
-            ServiceDependency::Group(OsString::from("network"))
-        );
-    }
-
-    #[test]
-    fn test_service_name_identifier() {
-        let dependency = ServiceDependency::from_system_identifier("netlogon");
-        assert_eq!(
-            dependency,
-            ServiceDependency::Service(OsString::from("netlogon"))
-        );
-    }
-}
+mod tests {}
