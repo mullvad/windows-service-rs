@@ -258,6 +258,26 @@ pub enum Error {
     Winapi(#[error(source)] std::io::Error),
 }
 
+impl Error {
+    /// Return if an error from win32 API call matches the specific OS error code.
+    ///
+    /// To find the names of OS error codes that a specific win32 API call may return,
+    /// browse the [official docs]. They are also defined in `windows_sys` crate.
+    ///
+    /// For example, [`windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST`] may
+    /// be returned by [`service_manager::ServiceManager::open_service`].
+    ///
+    /// [official docs]: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/#functions
+    pub fn is_os_error(&self, error_code: i32) -> bool {
+        if let Self::Winapi(e) = self {
+            if e.raw_os_error() == Some(error_code) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 mod sc_handle;
 pub mod service;
 pub mod service_control_handler;
