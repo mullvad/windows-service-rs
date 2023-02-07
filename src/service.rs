@@ -1455,8 +1455,13 @@ impl Service {
         }
     }
 
-    /// Delete the service from system registry.
-    pub fn delete(self) -> crate::Result<()> {
+    /// Mark the service for deletion from the service control manager database.
+    ///
+    /// The database entry is not removed until all open handles to the service have been closed
+    /// and the service is stopped. If the service is not or cannot be stopped, the database entry
+    /// is removed when the system is restarted. This function will return an error if the service
+    /// has already been marked for deletion.
+    pub fn delete(&self) -> crate::Result<()> {
         let success = unsafe { Services::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
