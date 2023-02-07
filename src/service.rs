@@ -454,7 +454,7 @@ impl RawServiceInfo {
             .iter()
             .map(|dependency| dependency.to_system_identifier())
             .collect();
-        let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
+        let joined_dependencies = double_nul_terminated::from_slice(&dependency_identifiers)
             .map_err(|_| Error::DependencyHasNulByte)?;
 
         Ok(Self {
