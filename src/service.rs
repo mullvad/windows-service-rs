@@ -13,6 +13,7 @@ use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
+        Storage::FileSystem,
         System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
         UI::WindowsAndMessaging,
     },
@@ -67,7 +68,7 @@ bitflags::bitflags! {
         const INTERROGATE = Services::SERVICE_INTERROGATE;
 
         /// Can delete the service
-        const DELETE = SystemServices::DELETE;
+        const DELETE = FileSystem::DELETE;
 
         /// Can query the services configuration
         const QUERY_CONFIG = Services::SERVICE_QUERY_CONFIG;

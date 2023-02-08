@@ -148,12 +148,10 @@ where
 
     match unsafe { ServiceControl::from_raw(control, event_type, event_data) } {
         Ok(service_control) => {
-            let need_release = match service_control {
-                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown => {
-                    true
-                }
-                _ => false,
-            };
+            let need_release = matches!(
+                service_control,
+                ServiceControl::Stop | ServiceControl::Shutdown | ServiceControl::Preshutdown,
+            );
 
             let return_code = event_handler(service_control).to_raw();
 
