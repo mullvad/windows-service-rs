@@ -269,12 +269,10 @@ impl Error {
     ///
     /// [official docs]: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/#functions
     pub fn is_os_error(&self, error_code: i32) -> bool {
-        if let Self::Winapi(e) = self {
-            if e.raw_os_error() == Some(error_code) {
-                return true;
-            }
+        match self {
+            Self::Winapi(e) => e.raw_os_error() == Some(error_code),
+            _ => false,
         }
-        false
     }
 }
 
