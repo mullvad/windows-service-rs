@@ -454,7 +454,7 @@ impl RawServiceInfo {
             .iter()
             .map(|dependency| dependency.to_system_identifier())
             .collect();
-        let joined_dependencies = double_nul_terminated::from_vec(&dependency_identifiers)
+        let joined_dependencies = double_nul_terminated::from_slice(&dependency_identifiers)
             .map_err(|_| Error::DependencyHasNulByte)?;
 
         Ok(Self {
@@ -1802,7 +1802,7 @@ pub(crate) fn to_wide(
 /// Escapes a given string, but also checks it does not contain any null bytes
 fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, ContainsNul<u16>> {
     let escaped = shell_escape::escape(Cow::Borrowed(s.as_ref()));
-    let wide = WideCString::from_os_str(&escaped)?;
+    let wide = WideCString::from_os_str(escaped)?;
     Ok(wide.to_ustring())
 }
 
