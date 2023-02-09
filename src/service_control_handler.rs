@@ -53,7 +53,7 @@ unsafe impl Sync for ServiceStatusHandle {}
 /// <https://msdn.microsoft.com/en-us/library/windows/desktop/ms683241(v=vs.85).aspx>
 #[derive(Debug)]
 pub enum ServiceControlHandlerResult {
-    /// Either used to aknowledge the call or grant the permission in advanced events.
+    /// Either used to acknowledge the call or grant the permission in advanced events.
     NoError,
     /// The received event is not implemented.
     NotImplemented,

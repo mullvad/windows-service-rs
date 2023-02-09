@@ -13,7 +13,7 @@ mod utf16 {
     pub const VTAB: u16 = 0x000B; // '\v'
 }
 
-/// Loselessly escape shell arguments on Windows.
+/// Losslessly escape shell arguments on Windows.
 ///
 /// Inspired by https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/.
 /// Heavily based on https://github.com/sfackler/shell-escape
