@@ -21,9 +21,9 @@ pub fn from_slice(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, Co
         for s in source {
             let checked_str = WideCString::from_os_str(s)?;
             wide.push_slice(checked_str);
-            wide.push_slice(&[0]);
+            wide.push_slice([0]);
         }
-        wide.push_slice(&[0]);
+        wide.push_slice([0]);
         Ok(Some(wide))
     }
 }
