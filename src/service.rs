@@ -1692,6 +1692,26 @@ impl Service {
         }
     }
 
+    /// Set if an auto-start service should be delayed.
+    ///
+    /// If true, the service is started after other auto-start services are started plus a short delay.
+    /// Otherwise, the service is started during system boot. The default is false. This setting is
+    /// ignored unless the service is an auto-start service.
+    ///
+    /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
+    pub fn set_delayed_auto_start(&self, delayed: bool) -> crate::Result<()> {
+        let mut delayed = Services::SERVICE_DELAYED_AUTO_START_INFO {
+            fDelayedAutostart: delayed as i32,
+        };
+        unsafe {
+            self.change_config2(
+                Services::SERVICE_CONFIG_DELAYED_AUTO_START_INFO,
+                &mut delayed,
+            )
+            .map_err(Error::Winapi)
+        }
+    }
+
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS>() };
