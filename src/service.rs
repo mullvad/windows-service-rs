@@ -1383,7 +1383,7 @@ impl Service {
             .map(|s| WideCString::from_os_str(s).map_err(|_| Error::StartArgumentHasNulByte))
             .collect::<crate::Result<Vec<WideCString>>>()?;
 
-        let raw_service_arguments: Vec<*mut u16> = wide_service_arguments
+        let raw_service_arguments: Vec<*const u16> = wide_service_arguments
             .iter()
             .map(|s| s.as_ptr() as _)
             .collect();
