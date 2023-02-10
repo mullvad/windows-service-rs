@@ -1338,7 +1338,7 @@ impl ServiceStatus {
 }
 
 /// This controls how the service SID is added to the service process token.
-/// https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_sid_info
+/// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_sid_info>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceSidType {
