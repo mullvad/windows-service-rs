@@ -1715,6 +1715,27 @@ impl Service {
         }
     }
 
+    /// Set the preshutdown timeout value of the service.
+    ///
+    /// When the system prepares to shutdown, the service control manager will send [`ServiceControl::Preshutdown`]
+    /// to any service that accepts [`ServiceControlAccept::PRESHUTDOWN`] and block shutdown until either the
+    /// service is stopped or the preshutdown timeout has elapsed. The default value is 180 seconds on releases
+    /// prior to Windows 10 build 15063, and 10 seconds afterwards. This value is irrelevant unless the service
+    /// handles [`ServiceControl::Preshutdown`].
+    ///
+    /// Panics if the specified timeout is too large to fit as milliseconds in a `u32`.
+    ///
+    /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
+    pub fn set_preshutdown_timeout(&self, timeout: Duration) -> crate::Result<()> {
+        let mut timeout = Services::SERVICE_PRESHUTDOWN_INFO {
+            dwPreshutdownTimeout: timeout.as_millis() as u32,
+        };
+        unsafe {
+            self.change_config2(Services::SERVICE_CONFIG_PRESHUTDOWN_INFO, &mut timeout)
+                .map_err(Error::Winapi)
+        }
+    }
+
     /// Private helper to send the control commands to the system.
     fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS>() };
