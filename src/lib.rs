@@ -178,84 +178,46 @@
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(err_derive::Error, Debug)]
-#[error(no_from)]
+#[derive(Debug)]
 pub enum Error {
-    /// Account name contains a nul byte.
-    #[error(display = "Account name contains a nul byte")]
-    AccountNameHasNulByte,
-
-    /// Account password contains a nul byte.
-    #[error(display = "Account password contains a nul byte")]
-    AccountPasswordHasNulByte,
-
-    /// Display name contains a nul byte.
-    #[error(display = "Display name contains a nul byte")]
-    DisplayNameHasNulByte,
-
-    /// Database name contains a nul byte.
-    #[error(display = "Database name contains a nul byte")]
-    DatabaseNameHasNulByte,
-
-    /// Executable path contains a nul byte.
-    #[error(display = "Executable path contains a nul byte")]
-    ExecutablePathHasNulByte,
-
-    /// Launch arguments contains a nul byte.
-    #[error(display = "Launch argument at index {} contains a nul byte", _0)]
-    LaunchArgumentHasNulByte(usize),
-
-    /// Launch arguments are not supported for kernel drivers.
-    #[error(display = "Kernel drivers do not support launch arguments")]
+    /// Kernel drivers do not support launch arguments
     LaunchArgumentsNotSupported,
+    /// A parse error caused by an invalid raw value
+    ParseValue(&'static str, service::ParseRawError),
+    /// An argument contains a nul byte
+    ArgumentHasNulByte(&'static str),
+    /// An argument array contains a nul byte in element at the given index
+    ArgumentArrayElementHasNulByte(&'static str, usize),
+    /// IO error in winapi call
+    Winapi(std::io::Error),
+}
 
-    /// Dependency name contains a nul byte.
-    #[error(display = "Dependency name contains a nul byte")]
-    DependencyHasNulByte,
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ParseValue(_, e) => Some(e),
+            Self::Winapi(e) => Some(e),
+            _ => None,
+        }
+    }
+}
 
-    /// Machine name contains a nul byte.
-    #[error(display = "Machine name contains a nul byte")]
-    MachineNameHasNulByte,
-
-    /// Service name contains a nul byte.
-    #[error(display = "Service name contains a nul byte")]
-    ServiceNameHasNulByte,
-
-    /// Start argument contains a nul byte.
-    #[error(display = "Start argument contains a nul byte")]
-    StartArgumentHasNulByte,
-
-    /// Invalid raw representation of [`ServiceState`](service::ServiceState).
-    #[error(display = "Invalid service state value")]
-    InvalidServiceState(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceStartType`](service::ServiceStartType).
-    #[error(display = "Invalid service start value")]
-    InvalidServiceStartType(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceErrorControl`](service::ServiceErrorControl).
-    #[error(display = "Invalid service error control value")]
-    InvalidServiceErrorControl(#[error(source)] service::ParseRawError),
-
-    /// Invalid raw representation of [`ServiceActionType`](service::ServiceActionType).
-    #[error(display = "Invalid service action type")]
-    InvalidServiceActionType(#[error(source)] service::ParseRawError),
-
-    /// Reboot message contains a nul byte.
-    #[error(display = "Service action failures reboot message contains a nul byte")]
-    ServiceActionFailuresRebootMessageHasNulByte,
-
-    /// Command contains a nul byte.
-    #[error(display = "Service action failures command contains a nul byte")]
-    ServiceActionFailuresCommandHasNulByte,
-
-    /// Service description contains a nul byte.
-    #[error(display = "Service description contains a nul byte")]
-    ServiceDescriptionHasNulByte,
-
-    /// IO error when calling winapi
-    #[error(display = "IO error in winapi call")]
-    Winapi(#[error(source)] std::io::Error),
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LaunchArgumentsNotSupported => {
+                write!(f, "kernel drivers do not support launch arguments")
+            }
+            Self::ParseValue(name, _) => write!(f, "invalid {} value", name),
+            Self::ArgumentHasNulByte(name) => write!(f, "{} contains a nul byte", name),
+            Self::ArgumentArrayElementHasNulByte(name, index) => write!(
+                f,
+                "{} contains a nul byte in element at {} index",
+                name, index
+            ),
+            Self::Winapi(_) => write!(f, "IO error in winapi call"),
+        }
+    }
 }
 
 mod sc_handle;

@@ -113,8 +113,8 @@ where
     // Important: leak the Box<F> which will be released in `service_control_handler`.
     let context: *mut F = Box::into_raw(heap_event_handler);
 
-    let service_name =
-        WideCString::from_os_str(service_name).map_err(|_| Error::ServiceNameHasNulByte)?;
+    let service_name = WideCString::from_os_str(service_name)
+        .map_err(|_| Error::ArgumentHasNulByte("service name"))?;
     let status_handle = unsafe {
         Services::RegisterServiceCtrlHandlerExW(
             service_name.as_ptr(),
