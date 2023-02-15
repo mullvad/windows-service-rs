@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Add support for delayed autostart in services. (See: `Service::set_delayed_auto_start`)
 
+### Changed
+- Breaking: Consolidate `Error` type. Remove dependency on `err-derive`.
+
 
 ## [0.5.0] - 2022-07-20
 ### Added
