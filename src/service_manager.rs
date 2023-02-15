@@ -40,8 +40,10 @@ impl ServiceManager {
         database: Option<impl AsRef<OsStr>>,
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
-        let machine_name = to_wide(machine).map_err(|_| Error::MachineNameHasNulByte)?;
-        let database_name = to_wide(database).map_err(|_| Error::DatabaseNameHasNulByte)?;
+        let machine_name =
+            to_wide(machine).map_err(|_| Error::ArgumentHasNulByte("machine name"))?;
+        let database_name =
+            to_wide(database).map_err(|_| Error::ArgumentHasNulByte("database name"))?;
         let handle = unsafe {
             Services::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
@@ -192,8 +194,8 @@ impl ServiceManager {
         name: impl AsRef<OsStr>,
         request_access: ServiceAccess,
     ) -> Result<Service> {
-        let service_name =
-            WideCString::from_os_str(name).map_err(|_| Error::ServiceNameHasNulByte)?;
+        let service_name = WideCString::from_os_str(name)
+            .map_err(|_| Error::ArgumentHasNulByte("service name"))?;
         let service_handle = unsafe {
             Services::OpenServiceW(
                 self.manager_handle.raw_handle(),

@@ -218,7 +218,7 @@ impl ServiceAction {
     pub fn from_raw(raw: Services::SC_ACTION) -> crate::Result<ServiceAction> {
         Ok(ServiceAction {
             action_type: ServiceActionType::from_raw(raw.Type)
-                .map_err(Error::InvalidServiceActionType)?,
+                .map_err(|e| Error::ParseValue("service action type", e))?,
             delay: Duration::from_millis(raw.Delay as u64),
         })
     }
@@ -409,13 +409,13 @@ pub(crate) struct RawServiceInfo {
 impl RawServiceInfo {
     pub fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
         let service_name = WideCString::from_os_str(&service_info.name)
-            .map_err(|_| Error::ServiceNameHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("service name"))?;
         let display_name = WideCString::from_os_str(&service_info.display_name)
-            .map_err(|_| Error::DisplayNameHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
         let account_name = to_wide(service_info.account_name.as_ref())
-            .map_err(|_| Error::AccountNameHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("account name"))?;
         let account_password = to_wide(service_info.account_password.as_ref())
-            .map_err(|_| Error::AccountPasswordHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("account password"))?;
 
         // escape executable path and arguments and combine them into a single command
         let mut launch_command_buffer = WideString::new();
@@ -430,16 +430,16 @@ impl RawServiceInfo {
 
             // also the path must not be quoted even if it contains spaces
             let executable_path = WideCString::from_os_str(&service_info.executable_path)
-                .map_err(|_| Error::ExecutablePathHasNulByte)?;
+                .map_err(|_| Error::ArgumentHasNulByte("executable path"))?;
             launch_command_buffer.push(executable_path.to_ustring());
         } else {
             let executable_path = escape_wide(&service_info.executable_path)
-                .map_err(|_| Error::ExecutablePathHasNulByte)?;
+                .map_err(|_| Error::ArgumentHasNulByte("executable path"))?;
             launch_command_buffer.push(executable_path);
 
             for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
-                let wide =
-                    escape_wide(launch_argument).map_err(|_| Error::LaunchArgumentHasNulByte(i))?;
+                let wide = escape_wide(launch_argument)
+                    .map_err(|_| Error::ArgumentArrayElementHasNulByte("launch argument", i))?;
 
                 launch_command_buffer.push_str(" ");
                 launch_command_buffer.push(wide);
@@ -455,7 +455,7 @@ impl RawServiceInfo {
             .map(|dependency| dependency.to_system_identifier())
             .collect();
         let joined_dependencies = double_nul_terminated::from_slice(&dependency_identifiers)
-            .map_err(|_| Error::DependencyHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("dependency"))?;
 
         Ok(Self {
             name: service_name,
@@ -546,9 +546,9 @@ impl ServiceConfig {
         Ok(ServiceConfig {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
             start_type: ServiceStartType::from_raw(raw.dwStartType)
-                .map_err(Error::InvalidServiceStartType)?,
+                .map_err(|e| Error::ParseValue("service start type", e))?,
             error_control: ServiceErrorControl::from_raw(raw.dwErrorControl)
-                .map_err(Error::InvalidServiceErrorControl)?,
+                .map_err(|e| Error::ParseValue("service error control", e))?,
             executable_path: PathBuf::from(
                 WideCStr::from_ptr_str(raw.lpBinaryPathName).to_os_string(),
             ),
@@ -1380,7 +1380,9 @@ impl Service {
     pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> crate::Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
-            .map(|s| WideCString::from_os_str(s).map_err(|_| Error::StartArgumentHasNulByte))
+            .map(|s| {
+                WideCString::from_os_str(s).map_err(|_| Error::ArgumentHasNulByte("start argument"))
+            })
             .collect::<crate::Result<Vec<WideCString>>>()?;
 
         let raw_service_arguments: Vec<*const u16> = wide_service_arguments
@@ -1448,7 +1450,8 @@ impl Service {
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw_ex(raw_status).map_err(Error::InvalidServiceState)
+            ServiceStatus::from_raw_ex(raw_status)
+                .map_err(|e| Error::ParseValue("service status", e))
         }
     }
 
@@ -1646,9 +1649,9 @@ impl Service {
             unsafe { mem::zeroed::<Services::SERVICE_FAILURE_ACTIONSW>() };
 
         let mut reboot_msg = to_wide_slice(update.reboot_msg)
-            .map_err(|_| Error::ServiceActionFailuresRebootMessageHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("service action failures reboot message"))?;
         let mut command = to_wide_slice(update.command)
-            .map_err(|_| Error::ServiceActionFailuresCommandHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("service action failures command"))?;
         let mut sc_actions: Option<Vec<Services::SC_ACTION>> = update
             .actions
             .map(|actions| actions.iter().map(ServiceAction::to_raw).collect());
@@ -1678,7 +1681,7 @@ impl Service {
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
     pub fn set_description(&self, description: impl AsRef<OsStr>) -> crate::Result<()> {
         let wide_str = WideCString::from_os_str(description)
-            .map_err(|_| Error::ServiceDescriptionHasNulByte)?;
+            .map_err(|_| Error::ArgumentHasNulByte("service description"))?;
         let mut service_description = Services::SERVICE_DESCRIPTIONW {
             lpDescription: wide_str.as_ptr() as *mut _,
         };
@@ -1726,7 +1729,7 @@ impl Service {
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            ServiceStatus::from_raw(raw_status).map_err(Error::InvalidServiceState)
+            ServiceStatus::from_raw(raw_status).map_err(|e| Error::ParseValue("service status", e))
         }
     }
 
@@ -1780,16 +1783,29 @@ fn to_wide_slice(
     }
 }
 
-#[derive(err_derive::Error, Debug)]
+#[derive(Debug)]
 pub enum ParseRawError {
-    #[error(display = "Invalid integer value for the target type: {}", _0)]
     InvalidInteger(u32),
-
-    #[error(display = "Invalid integer value for the target type: {}", _0)]
     InvalidIntegerSigned(i32),
-
-    #[error(display = "Invalid GUID value for the target type: {}", _0)]
     InvalidGuid(String),
+}
+
+impl std::error::Error for ParseRawError {}
+
+impl std::fmt::Display for ParseRawError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInteger(u) => {
+                write!(f, "invalid unsigned integer for the target type: {}", u)
+            }
+            Self::InvalidIntegerSigned(i) => {
+                write!(f, "invalid signed integer for the target type: {}", i)
+            }
+            Self::InvalidGuid(guid) => {
+                write!(f, "invalid GUID value for the target type: {}", guid)
+            }
+        }
+    }
 }
 
 fn string_from_guid(guid: &GUID) -> String {
