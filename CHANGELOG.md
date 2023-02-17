@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - Breaking: Consolidate `Error` type. Remove dependency on `err-derive`.
+- Breaking: `Service::delete` does not consume `self` any longer. Make sure to `drop` a reference 
+  to `Service` manually if you plan to poll SCM synchronously to determine when the service is 
+  removed from system. (See `uninstall_service.rs` example)
 
 
 ## [0.5.0] - 2022-07-20
