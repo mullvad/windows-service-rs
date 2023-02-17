@@ -1,5 +1,10 @@
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
+    use std::{
+        thread::sleep,
+        time::{Duration, Instant},
+    };
+
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},
@@ -23,14 +28,22 @@ fn main() -> windows_service::Result<()> {
     // Explicitly close our open handle to the service. This is automatically called when `service` goes out of scope.
     drop(service);
 
-    // Check if the service is deleted.
-    if let Err(windows_service::Error::Winapi(e)) =
-        service_manager.open_service("ping_service", ServiceAccess::QUERY_STATUS)
-    {
-        if e.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) {
-            println!("ping_service is deleted.");
+    // Win32 API does not give us a way to wait for service deletion.
+    // To check if the service is deleted from the database, we have to poll it ourselves.
+    let start = Instant::now();
+    let timeout = Duration::from_secs(5);
+    while start.elapsed() < timeout {
+        if let Err(windows_service::Error::Winapi(e)) =
+            service_manager.open_service("ping_service", ServiceAccess::QUERY_STATUS)
+        {
+            if e.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) {
+                println!("ping_service is deleted.");
+                return Ok(());
+            }
         }
+        sleep(Duration::from_secs(1));
     }
+    println!("ping_service is marked for deletion.");
 
     Ok(())
 }
