@@ -1728,7 +1728,7 @@ impl Service {
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
     pub fn set_preshutdown_timeout(&self, timeout: Duration) -> crate::Result<()> {
         let mut timeout = Services::SERVICE_PRESHUTDOWN_INFO {
-            dwPreshutdownTimeout: timeout.as_millis() as u32,
+            dwPreshutdownTimeout: u32::try_from(timeout.as_millis()).expect("Too long timeout"),
         };
         unsafe {
             self.change_config2(Services::SERVICE_CONFIG_PRESHUTDOWN_INFO, &mut timeout)
