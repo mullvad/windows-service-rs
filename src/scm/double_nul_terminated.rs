@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+
 use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
 use windows_sys::core::PWSTR;
 
@@ -12,7 +13,9 @@ use windows_sys::core::PWSTR;
 /// "Hello\0World\0\0"
 ///
 /// Returns None if the source collection is empty.
-pub fn from_slice(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, ContainsNul<u16>> {
+pub(super) fn from_slice(
+    source: &[impl AsRef<OsStr>],
+) -> Result<Option<WideString>, ContainsNul<u16>> {
     if source.is_empty() {
         Ok(None)
     } else {
@@ -36,7 +39,7 @@ pub fn from_slice(source: &[impl AsRef<OsStr>]) -> Result<Option<WideString>, Co
 ///
 /// Output:
 /// ["Hello", "World"]
-pub unsafe fn parse_str_ptr(double_nul_terminated_string: PWSTR) -> Vec<OsString> {
+pub(super) unsafe fn parse_str_ptr(double_nul_terminated_string: PWSTR) -> Vec<OsString> {
     let mut results: Vec<OsString> = Vec::new();
 
     if !double_nul_terminated_string.is_null() {

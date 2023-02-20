@@ -1,27 +1,25 @@
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::ffi::{OsStr, OsString};
-use std::os::raw::c_void;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use std::path::PathBuf;
-use std::ptr;
-use std::time::Duration;
-use std::{io, mem};
+mod data;
+mod double_nul_terminated;
+mod flags;
+mod shell_escape;
+mod utils;
 
-use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
-use windows_sys::{
-    core::GUID,
-    Win32::{
-        Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
-        Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
-        UI::WindowsAndMessaging,
-    },
+use std::{ffi::OsStr, io, mem, ptr, time::Duration};
+
+use widestring::WideCString;
+use windows_sys::Win32::{Security, System::Services};
+
+use crate::{
+    service::{ServiceControl, ServiceStatus},
+    Error, Result,
 };
 
-use crate::sc_handle::ScHandle;
-use crate::shell_escape;
-use crate::{double_nul_terminated, Error};
+pub use data::{
+    ServiceAction, ServiceActionType, ServiceConfig, ServiceDependency, ServiceErrorControl,
+    ServiceFailureActions, ServiceFailureResetPeriod, ServiceInfo, ServiceSidType,
+    ServiceStartType,
+};
+pub use flags::{ServiceAccess, ServiceManagerAccess};
 
 /// A struct that represents a system service.
 ///
@@ -29,11 +27,14 @@ use crate::{double_nul_terminated, Error};
 ///
 /// [`ServiceManager`]: super::service_manager::ServiceManager
 pub struct Service {
-    service_handle: ScHandle,
+    service_handle: RawServiceHandle,
 }
 
 impl Service {
-    pub(crate) fn new(service_handle: ScHandle) -> Self {
+    /// The maximum size of data buffer used by QueryServiceConfigW and QueryServiceConfig2W is 8K
+    const MAX_QUERY_BUFFER_SIZE: usize = 8 * 1024;
+
+    fn new(service_handle: RawServiceHandle) -> Self {
         Service { service_handle }
     }
 
@@ -53,13 +54,13 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> crate::Result<()> {
+    pub fn start<S: AsRef<OsStr>>(&self, service_arguments: &[S]) -> Result<()> {
         let wide_service_arguments = service_arguments
             .iter()
             .map(|s| {
                 WideCString::from_os_str(s).map_err(|_| Error::ArgumentHasNulByte("start argument"))
             })
-            .collect::<crate::Result<Vec<WideCString>>>()?;
+            .collect::<Result<Vec<WideCString>>>()?;
 
         let raw_service_arguments: Vec<*const u16> = wide_service_arguments
             .iter()
@@ -82,7 +83,7 @@ impl Service {
     }
 
     /// Stop the service.
-    pub fn stop(&self) -> crate::Result<ServiceStatus> {
+    pub fn stop(&self) -> Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Stop)
     }
 
@@ -101,17 +102,17 @@ impl Service {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn pause(&self) -> crate::Result<ServiceStatus> {
+    pub fn pause(&self) -> Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Pause)
     }
 
     /// Resume the paused service.
-    pub fn resume(&self) -> crate::Result<ServiceStatus> {
+    pub fn resume(&self) -> Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Continue)
     }
 
     /// Get the service status from the system.
-    pub fn query_status(&self) -> crate::Result<ServiceStatus> {
+    pub fn query_status(&self) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS_PROCESS>() };
         let mut bytes_needed: u32 = 0;
         let success = unsafe {
@@ -137,7 +138,7 @@ impl Service {
     /// and the service is stopped. If the service is not or cannot be stopped, the database entry
     /// is removed when the system is restarted. This function will return an error if the service
     /// has already been marked for deletion.
-    pub fn delete(&self) -> crate::Result<()> {
+    pub fn delete(&self) -> Result<()> {
         let success = unsafe { Services::DeleteService(self.service_handle.raw_handle()) };
         if success == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
@@ -147,9 +148,9 @@ impl Service {
     }
 
     /// Get the service config from the system.
-    pub fn query_config(&self) -> crate::Result<ServiceConfig> {
+    pub fn query_config(&self) -> Result<ServiceConfig> {
         // As per docs, the maximum size of data buffer used by QueryServiceConfigW is 8K
-        let mut data = vec![0u8; MAX_QUERY_BUFFER_SIZE];
+        let mut data = vec![0u8; Self::MAX_QUERY_BUFFER_SIZE];
         let mut bytes_written: u32 = 0;
 
         let success = unsafe {
@@ -179,8 +180,8 @@ impl Service {
     /// any of the string arguments to indicate that they should not be updated.
     ///
     /// If we wanted to support this we wouldn't be able to reuse the `ServiceInfo` struct.
-    pub fn change_config(&self, service_info: &ServiceInfo) -> crate::Result<()> {
-        let raw_info = RawServiceInfo::new(service_info)?;
+    pub fn change_config(&self, service_info: &ServiceInfo) -> Result<()> {
+        let raw_info = data::RawServiceInfo::new(service_info)?;
         let success = unsafe {
             Services::ChangeServiceConfigW(
                 self.service_handle.raw_handle(),
@@ -219,7 +220,7 @@ impl Service {
     ///
     /// Please refer to MSDN for more info:\
     /// <https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-_service_failure_actions_flag>
-    pub fn set_failure_actions_on_non_crash_failures(&self, enabled: bool) -> crate::Result<()> {
+    pub fn set_failure_actions_on_non_crash_failures(&self, enabled: bool) -> Result<()> {
         let mut raw_failure_actions_flag =
             unsafe { mem::zeroed::<Services::SERVICE_FAILURE_ACTIONS_FLAG>() };
 
@@ -236,8 +237,8 @@ impl Service {
 
     /// Query the system for the boolean indication that the service is configured to run failure
     /// actions on non-crash failures.
-    pub fn get_failure_actions_on_non_crash_failures(&self) -> crate::Result<bool> {
-        let mut data = vec![0u8; MAX_QUERY_BUFFER_SIZE];
+    pub fn get_failure_actions_on_non_crash_failures(&self) -> Result<bool> {
+        let mut data = vec![0u8; Self::MAX_QUERY_BUFFER_SIZE];
 
         let raw_failure_actions_flag: Services::SERVICE_FAILURE_ACTIONS_FLAG = unsafe {
             self.query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &mut data)
@@ -246,10 +247,7 @@ impl Service {
         Ok(raw_failure_actions_flag.fFailureActionsOnNonCrashFailures != 0)
     }
 
-    pub fn set_config_service_sid_info(
-        &self,
-        mut service_sid_type: ServiceSidType,
-    ) -> crate::Result<()> {
+    pub fn set_config_service_sid_info(&self, mut service_sid_type: ServiceSidType) -> Result<()> {
         // The structure we need to pass in is `SERVICE_SID_INFO`.
         // It has a single member that specifies the new SID type, and as such,
         // we can get away with not explicitly creating a structure in Rust.
@@ -263,9 +261,9 @@ impl Service {
     }
 
     /// Query the configured failure actions for the service.
-    pub fn get_failure_actions(&self) -> crate::Result<ServiceFailureActions> {
+    pub fn get_failure_actions(&self) -> Result<ServiceFailureActions> {
         unsafe {
-            let mut data = vec![0u8; MAX_QUERY_BUFFER_SIZE];
+            let mut data = vec![0u8; Self::MAX_QUERY_BUFFER_SIZE];
 
             let raw_failure_actions: Services::SERVICE_FAILURE_ACTIONSW = self
                 .query_config2(Services::SERVICE_CONFIG_FAILURE_ACTIONS, &mut data)
@@ -325,13 +323,13 @@ impl Service {
     /// #    Ok(())
     /// # }
     /// ```
-    pub fn update_failure_actions(&self, update: ServiceFailureActions) -> crate::Result<()> {
+    pub fn update_failure_actions(&self, update: ServiceFailureActions) -> Result<()> {
         let mut raw_failure_actions =
             unsafe { mem::zeroed::<Services::SERVICE_FAILURE_ACTIONSW>() };
 
-        let mut reboot_msg = to_wide_slice(update.reboot_msg)
+        let mut reboot_msg = utils::to_wide_slice(update.reboot_msg)
             .map_err(|_| Error::ArgumentHasNulByte("service action failures reboot message"))?;
-        let mut command = to_wide_slice(update.command)
+        let mut command = utils::to_wide_slice(update.command)
             .map_err(|_| Error::ArgumentHasNulByte("service action failures command"))?;
         let mut sc_actions: Option<Vec<Services::SC_ACTION>> = update
             .actions
@@ -360,7 +358,7 @@ impl Service {
     /// Set service description.
     ///
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
-    pub fn set_description(&self, description: impl AsRef<OsStr>) -> crate::Result<()> {
+    pub fn set_description(&self, description: impl AsRef<OsStr>) -> Result<()> {
         let wide_str = WideCString::from_os_str(description)
             .map_err(|_| Error::ArgumentHasNulByte("service description"))?;
         let mut service_description = Services::SERVICE_DESCRIPTIONW {
@@ -383,7 +381,7 @@ impl Service {
     /// ignored unless the service is an auto-start service.
     ///
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
-    pub fn set_delayed_auto_start(&self, delayed: bool) -> crate::Result<()> {
+    pub fn set_delayed_auto_start(&self, delayed: bool) -> Result<()> {
         let mut delayed = Services::SERVICE_DELAYED_AUTO_START_INFO {
             fDelayedAutostart: delayed as i32,
         };
@@ -407,7 +405,7 @@ impl Service {
     /// Panics if the specified timeout is too large to fit as milliseconds in a `u32`.
     ///
     /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
-    pub fn set_preshutdown_timeout(&self, timeout: Duration) -> crate::Result<()> {
+    pub fn set_preshutdown_timeout(&self, timeout: Duration) -> Result<()> {
         let mut timeout = Services::SERVICE_PRESHUTDOWN_INFO {
             dwPreshutdownTimeout: u32::try_from(timeout.as_millis()).expect("Too long timeout"),
         };
@@ -418,7 +416,7 @@ impl Service {
     }
 
     /// Private helper to send the control commands to the system.
-    fn send_control_command(&self, command: ServiceControl) -> crate::Result<ServiceStatus> {
+    fn send_control_command(&self, command: ServiceControl) -> Result<ServiceStatus> {
         let mut raw_status = unsafe { mem::zeroed::<Services::SERVICE_STATUS>() };
         let success = unsafe {
             Services::ControlService(
@@ -470,21 +468,9 @@ impl Service {
     }
 }
 
-/// The maximum size of data buffer used by QueryServiceConfigW and QueryServiceConfig2W is 8K
-const MAX_QUERY_BUFFER_SIZE: usize = 8 * 1024;
-use std::ffi::OsStr;
-use std::{io, ptr};
-
-use widestring::WideCString;
-use windows_sys::Win32::System::Services;
-
-use crate::sc_handle::ScHandle;
-use crate::service::{to_wide, RawServiceInfo, Service, ServiceAccess, ServiceInfo};
-use crate::{Error, Result};
-
 /// Service manager.
 pub struct ServiceManager {
-    manager_handle: ScHandle,
+    manager_handle: RawServiceHandle,
 }
 
 impl ServiceManager {
@@ -501,9 +487,9 @@ impl ServiceManager {
         request_access: ServiceManagerAccess,
     ) -> Result<Self> {
         let machine_name =
-            to_wide(machine).map_err(|_| Error::ArgumentHasNulByte("machine name"))?;
+            utils::to_wide(machine).map_err(|_| Error::ArgumentHasNulByte("machine name"))?;
         let database_name =
-            to_wide(database).map_err(|_| Error::ArgumentHasNulByte("database name"))?;
+            utils::to_wide(database).map_err(|_| Error::ArgumentHasNulByte("database name"))?;
         let handle = unsafe {
             Services::OpenSCManagerW(
                 machine_name.map_or(ptr::null(), |s| s.as_ptr()),
@@ -516,7 +502,7 @@ impl ServiceManager {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(ServiceManager {
-                manager_handle: unsafe { ScHandle::new(handle) },
+                manager_handle: unsafe { RawServiceHandle::new(handle) },
             })
         }
     }
@@ -595,7 +581,7 @@ impl ServiceManager {
         service_info: &ServiceInfo,
         service_access: ServiceAccess,
     ) -> Result<Service> {
-        let raw_info = RawServiceInfo::new(service_info)?;
+        let raw_info = data::RawServiceInfo::new(service_info)?;
         let service_handle = unsafe {
             Services::CreateServiceW(
                 self.manager_handle.raw_handle(),
@@ -626,7 +612,9 @@ impl ServiceManager {
         if service_handle == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
+            Ok(Service::new(unsafe {
+                RawServiceHandle::new(service_handle)
+            }))
         }
     }
 
@@ -667,27 +655,28 @@ impl ServiceManager {
         if service_handle == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
+            Ok(Service::new(unsafe {
+                RawServiceHandle::new(service_handle)
+            }))
         }
     }
 }
-use windows_sys::Win32::{Security, System::Services};
 
 /// A handle holder that wraps a low level [`Security::SC_HANDLE`].
-pub(crate) struct ScHandle(Security::SC_HANDLE);
+struct RawServiceHandle(Security::SC_HANDLE);
 
-impl ScHandle {
-    pub(crate) unsafe fn new(handle: Security::SC_HANDLE) -> Self {
-        ScHandle(handle)
+impl RawServiceHandle {
+    unsafe fn new(handle: Security::SC_HANDLE) -> Self {
+        RawServiceHandle(handle)
     }
 
     /// Returns underlying [`Security::SC_HANDLE`].
-    pub(crate) fn raw_handle(&self) -> Security::SC_HANDLE {
+    fn raw_handle(&self) -> Security::SC_HANDLE {
         self.0
     }
 }
 
-impl Drop for ScHandle {
+impl Drop for RawServiceHandle {
     fn drop(&mut self) {
         unsafe { Services::CloseServiceHandle(self.0) };
     }

@@ -1,7 +1,9 @@
-use std::borrow::Cow;
-use std::ffi::{OsStr, OsString};
-use std::iter::repeat;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::{
+    borrow::Cow,
+    ffi::{OsStr, OsString},
+    iter::repeat,
+    os::windows::ffi::{OsStrExt, OsStringExt},
+};
 
 /// Common UTF-16 code points.
 mod utf16 {
@@ -17,7 +19,7 @@ mod utf16 {
 ///
 /// Inspired by https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/.
 /// Heavily based on https://github.com/sfackler/shell-escape
-pub fn escape(s: Cow<'_, OsStr>) -> Cow<'_, OsStr> {
+pub(super) fn escape(s: Cow<'_, OsStr>) -> Cow<'_, OsStr> {
     static ESCAPE_CHARS: &[u16] = &[
         utf16::DOUBLEQUOTE,
         utf16::SPACE,

@@ -1,27 +1,20 @@
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::ffi::{OsStr, OsString};
-use std::os::raw::c_void;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use std::path::PathBuf;
-use std::ptr;
-use std::time::Duration;
-use std::{io, mem};
+use std::{convert::TryFrom, mem, os::raw::c_void, time::Duration};
 
-use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
 use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
-        Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
+        System::{Power, RemoteDesktop, Services, SystemServices},
         UI::WindowsAndMessaging,
     },
 };
 
-use crate::sc_handle::ScHandle;
-use crate::shell_escape;
-use crate::{double_nul_terminated, Error};
+#[cfg(feature = "scm")]
+pub use crate::scm::{
+    Service, ServiceAccess, ServiceAction, ServiceActionType, ServiceConfig, ServiceDependency,
+    ServiceErrorControl, ServiceFailureActions, ServiceFailureResetPeriod, ServiceInfo,
+    ServiceManagerAccess, ServiceSidType, ServiceStartType,
+};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
@@ -591,6 +584,7 @@ pub enum ServiceState {
 }
 
 impl ServiceState {
+    #[cfg(feature = "scm")]
     fn from_raw(raw: u32) -> Result<Self, ParseRawError> {
         match raw {
             x if x == ServiceState::Stopped.to_raw() => Ok(ServiceState::Stopped),
@@ -790,7 +784,8 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw(raw: Services::SERVICE_STATUS) -> Result<Self, ParseRawError> {
+    #[cfg(feature = "scm")]
+    pub(crate) fn from_raw(raw: Services::SERVICE_STATUS) -> Result<Self, ParseRawError> {
         Ok(ServiceStatus {
             service_type: ServiceType::from_bits_truncate(raw.dwServiceType),
             current_state: ServiceState::from_raw(raw.dwCurrentState)?,
@@ -807,7 +802,10 @@ impl ServiceStatus {
     /// # Errors
     ///
     /// Returns an error if the `dwCurrentState` field does not represent a valid [`ServiceState`].
-    fn from_raw_ex(raw: Services::SERVICE_STATUS_PROCESS) -> Result<Self, ParseRawError> {
+    #[cfg(feature = "scm")]
+    pub(crate) fn from_raw_ex(
+        raw: Services::SERVICE_STATUS_PROCESS,
+    ) -> Result<Self, ParseRawError> {
         let current_state = ServiceState::from_raw(raw.dwCurrentState)?;
         let process_id = match current_state {
             ServiceState::Running => Some(raw.dwProcessId),

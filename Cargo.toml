@@ -13,6 +13,14 @@ edition = "2021"
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
 
+[features]
+default = ["scm"]
+scm = [
+    "windows-sys/Win32_Security",
+    "windows-sys/Win32_Storage_FileSystem",
+    "windows-sys/Win32_System_WindowsProgramming"
+]
+
 [target.'cfg(windows)'.dependencies]
 bitflags = "1.3"
 widestring = "1"
@@ -21,12 +29,9 @@ widestring = "1"
 version = "0.45.0"
 features = [
     "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Storage_FileSystem",
     "Win32_System_Power",
     "Win32_System_RemoteDesktop",
     "Win32_System_Services",
     "Win32_System_SystemServices",
-    "Win32_System_WindowsProgramming",
     "Win32_UI_WindowsAndMessaging",
 ]

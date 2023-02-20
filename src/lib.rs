@@ -220,12 +220,10 @@ impl std::fmt::Display for Error {
     }
 }
 
-mod sc_handle;
+#[cfg(feature = "scm")]
+pub mod scm;
 pub mod service;
 pub mod service_control_handler;
 pub mod service_manager;
 #[macro_use]
 pub mod service_dispatcher;
-
-mod double_nul_terminated;
-mod shell_escape;

@@ -1,27 +1,18 @@
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::ffi::{OsStr, OsString};
-use std::os::raw::c_void;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use std::path::PathBuf;
-use std::ptr;
-use std::time::Duration;
-use std::{io, mem};
-
-use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
-use windows_sys::{
-    core::GUID,
-    Win32::{
-        Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
-        Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
-        UI::WindowsAndMessaging,
-    },
+use std::{
+    ffi::{OsStr, OsString},
+    os::windows::ffi::{OsStrExt, OsStringExt},
+    path::PathBuf,
+    ptr,
+    time::Duration,
 };
 
-use crate::sc_handle::ScHandle;
-use crate::shell_escape;
-use crate::{double_nul_terminated, Error};
+use widestring::{WideCStr, WideCString, WideString};
+use windows_sys::Win32::System::{Services, WindowsProgramming::INFINITE};
+
+use crate::{
+    service::{ParseRawError, ServiceType},
+    Error,
+};
 
 /// Enum describing the start options for windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -319,7 +310,7 @@ pub struct ServiceInfo {
 }
 
 /// Same as `ServiceInfo` but with fields that are compatible with the Windows API.
-pub(crate) struct RawServiceInfo {
+pub(super) struct RawServiceInfo {
     /// Service name
     pub name: WideCString,
 
@@ -352,14 +343,14 @@ pub(crate) struct RawServiceInfo {
 }
 
 impl RawServiceInfo {
-    pub fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
+    pub(super) fn new(service_info: &ServiceInfo) -> crate::Result<Self> {
         let service_name = WideCString::from_os_str(&service_info.name)
             .map_err(|_| Error::ArgumentHasNulByte("service name"))?;
         let display_name = WideCString::from_os_str(&service_info.display_name)
             .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
-        let account_name = to_wide(service_info.account_name.as_ref())
+        let account_name = super::utils::to_wide(service_info.account_name.as_ref())
             .map_err(|_| Error::ArgumentHasNulByte("account name"))?;
-        let account_password = to_wide(service_info.account_password.as_ref())
+        let account_password = super::utils::to_wide(service_info.account_password.as_ref())
             .map_err(|_| Error::ArgumentHasNulByte("account password"))?;
 
         // escape executable path and arguments and combine them into a single command
@@ -378,12 +369,12 @@ impl RawServiceInfo {
                 .map_err(|_| Error::ArgumentHasNulByte("executable path"))?;
             launch_command_buffer.push(executable_path.to_ustring());
         } else {
-            let executable_path = escape_wide(&service_info.executable_path)
+            let executable_path = super::utils::escape_wide(&service_info.executable_path)
                 .map_err(|_| Error::ArgumentHasNulByte("executable path"))?;
             launch_command_buffer.push(executable_path);
 
             for (i, launch_argument) in service_info.launch_arguments.iter().enumerate() {
-                let wide = escape_wide(launch_argument)
+                let wide = super::utils::escape_wide(launch_argument)
                     .map_err(|_| Error::ArgumentArrayElementHasNulByte("launch argument", i))?;
 
                 launch_command_buffer.push_str(" ");
@@ -399,7 +390,7 @@ impl RawServiceInfo {
             .iter()
             .map(|dependency| dependency.to_system_identifier())
             .collect();
-        let joined_dependencies = double_nul_terminated::from_slice(&dependency_identifiers)
+        let joined_dependencies = super::double_nul_terminated::from_slice(&dependency_identifiers)
             .map_err(|_| Error::ArgumentHasNulByte("dependency"))?;
 
         Ok(Self {
@@ -445,7 +436,7 @@ pub struct ServiceConfig {
     /// for example: NT Authority\System.
     ///
     /// This value can be `None` in certain cases, please refer to MSDN for more info:\
-    /// <https://docs.microsoft.com/en-us/windows/desktop/api/winsvc/ns-winsvc-_query_service_configw>
+    /// <https://docs.microsoft.com/en-us/windows/desktop/api/winsvc/ns-winsvc-query_service_configw>
     pub account_name: Option<OsString>,
 
     /// User-friendly service name
@@ -469,7 +460,7 @@ impl ServiceConfig {
     /// `lpLoadOrderGroup`, `lpServiceStartName`, `lpBinaryPathName` and `lpDisplayName` must be
     /// either null or proper null terminated wide C strings.
     pub unsafe fn from_raw(raw: Services::QUERY_SERVICE_CONFIGW) -> crate::Result<ServiceConfig> {
-        let dependencies = double_nul_terminated::parse_str_ptr(raw.lpDependencies)
+        let dependencies = super::double_nul_terminated::parse_str_ptr(raw.lpDependencies)
             .iter()
             .map(ServiceDependency::from_system_identifier)
             .collect();

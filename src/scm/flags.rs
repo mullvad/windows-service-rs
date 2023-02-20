@@ -1,27 +1,4 @@
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::ffi::{OsStr, OsString};
-use std::os::raw::c_void;
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use std::path::PathBuf;
-use std::ptr;
-use std::time::Duration;
-use std::{io, mem};
-
-use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
-use windows_sys::{
-    core::GUID,
-    Win32::{
-        Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
-        Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
-        UI::WindowsAndMessaging,
-    },
-};
-
-use crate::sc_handle::ScHandle;
-use crate::shell_escape;
-use crate::{double_nul_terminated, Error};
+use windows_sys::Win32::{Storage::FileSystem, System::Services};
 
 bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
@@ -51,15 +28,6 @@ bitflags::bitflags! {
         const CHANGE_CONFIG = Services::SERVICE_CHANGE_CONFIG;
     }
 }
-use std::ffi::OsStr;
-use std::{io, ptr};
-
-use widestring::WideCString;
-use windows_sys::Win32::System::Services;
-
-use crate::sc_handle::ScHandle;
-use crate::service::{to_wide, RawServiceInfo, Service, ServiceAccess, ServiceInfo};
-use crate::{Error, Result};
 
 bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
