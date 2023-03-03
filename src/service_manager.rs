@@ -212,7 +212,7 @@ impl ServiceManager {
         }
     }
 
-    /// Search the service name associated with a service display name.
+    /// Return the service name given a service display name.
     ///
     /// # Arguments
     ///
@@ -225,11 +225,14 @@ impl ServiceManager {
     ///
     /// # fn main() -> windows_service::Result<()> {
     /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    /// let my_service_name = manager.get_service_key_name("My Service Display Name")?;
+    /// let my_service_name = manager.service_name_from_display_name("My Service Display Name")?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
+    pub fn service_name_from_display_name(
+        &self,
+        display_name: impl AsRef<OsStr>,
+    ) -> Result<OsString> {
         let service_display_name = WideCString::from_os_str(display_name)
             .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
 
