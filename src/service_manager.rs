@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::os::windows::ffi::OsStringExt;
 use std::{io, ptr};
 
 use widestring::WideCString;
@@ -229,8 +230,8 @@ impl ServiceManager {
     /// # }
     /// ```
     pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
-        let service_display_name =
-            WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
+        let service_display_name = WideCString::from_os_str(display_name)
+            .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
         // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k bytes,
         // which is 2k wchars
         let mut max_len = 2u32 * 1024;
@@ -247,9 +248,7 @@ impl ServiceManager {
         if result == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            let service_name = WideCString::from_vec(&buffer[..size as usize])
-                .map_err(|_| Error::ServiceNameHasNulByte)?;
-            Ok(service_name.to_os_string())
+            Ok(OsString::from_wide(&buffer[..max_len as usize]))
         }
     }
 }
