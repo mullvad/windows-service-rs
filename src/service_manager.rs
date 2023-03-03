@@ -231,15 +231,16 @@ impl ServiceManager {
     pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
         let service_display_name =
             WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
-        // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k
-        let mut size = 4u32 * 1024;
-        let mut buffer = vec![0u16; size as usize];
+        // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k bytes,
+        // which is 2k wchars
+        let mut max_len = 2u32 * 1024;
+        let mut buffer = vec![0u16; usize::try_from(max_len).expect("u32 must fit in usize")];
         let result = unsafe {
             Services::GetServiceKeyNameW(
                 self.manager_handle.raw_handle(),
                 service_display_name.as_ptr(),
                 buffer.as_mut_ptr(),
-                &mut size as _,
+                &mut max_len,
             )
         };
 
