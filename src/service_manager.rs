@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::os::windows::ffi::OsStringExt;
 use std::{io, ptr};
 
 use widestring::WideCString;
@@ -229,26 +230,29 @@ impl ServiceManager {
     /// # }
     /// ```
     pub fn get_service_key_name(&self, display_name: impl AsRef<OsStr>) -> Result<OsString> {
-        let service_display_name =
-            WideCString::from_os_str(display_name).map_err(|_| Error::DisplayNameHasNulByte)?;
-        // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k
-        let mut size = 4u32 * 1024;
-        let mut buffer = vec![0u16; size as usize];
+        let service_display_name = WideCString::from_os_str(display_name)
+            .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
+
+        // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k bytes,
+        // which is 2k wchars
+        let mut buffer = [0u16; 2 * 1024];
+        let mut buffer_len = u32::try_from(buffer.len()).expect("size must fit in u32");
+
         let result = unsafe {
             Services::GetServiceKeyNameW(
                 self.manager_handle.raw_handle(),
                 service_display_name.as_ptr(),
                 buffer.as_mut_ptr(),
-                &mut size as _,
+                &mut buffer_len,
             )
         };
 
         if result == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            let service_name = WideCString::from_vec(&buffer[..size as usize])
-                .map_err(|_| Error::ServiceNameHasNulByte)?;
-            Ok(service_name.to_os_string())
+            Ok(OsString::from_wide(
+                &buffer[..usize::try_from(buffer_len).unwrap()],
+            ))
         }
     }
 }
