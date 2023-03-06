@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Add support for delayed autostart in services. (See: `Service::set_delayed_auto_start`)
 - Add support for specifying a preshutdown timeout. (See: `Service::set_preshutdown_timeout`)
+- Add function for obtaining service names from display names.
+  (See: `ServiceManager::service_name_from_display_name`)
 
 ### Changed
 - Breaking: Consolidate `Error` type. Remove dependency on `err-derive`.
