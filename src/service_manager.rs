@@ -235,23 +235,27 @@ impl ServiceManager {
     ) -> Result<OsString> {
         let service_display_name = WideCString::from_os_str(display_name)
             .map_err(|_| Error::ArgumentHasNulByte("display name"))?;
+
         // As per docs, the maximum size of data buffer used by GetServiceKeyNameW is 4k bytes,
         // which is 2k wchars
-        let mut max_len = 2u32 * 1024;
-        let mut buffer = vec![0u16; usize::try_from(max_len).expect("u32 must fit in usize")];
+        let mut buffer = [0u16; 2 * 1024];
+        let mut buffer_len = u32::try_from(buffer.len()).expect("size must fit in u32");
+
         let result = unsafe {
             Services::GetServiceKeyNameW(
                 self.manager_handle.raw_handle(),
                 service_display_name.as_ptr(),
                 buffer.as_mut_ptr(),
-                &mut max_len,
+                &mut buffer_len,
             )
         };
 
         if result == 0 {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
-            Ok(OsString::from_wide(&buffer[..max_len as usize]))
+            Ok(OsString::from_wide(
+                &buffer[..usize::try_from(buffer_len).unwrap()],
+            ))
         }
     }
 }
