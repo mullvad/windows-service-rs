@@ -25,7 +25,7 @@ use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
-    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    #[derive(Debug, Clone, Hash, Eq, PartialEq, Copy)]
     pub struct ServiceType: u32 {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = Services::SERVICE_FILE_SYSTEM_DRIVER;
