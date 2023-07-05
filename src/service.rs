@@ -14,7 +14,7 @@ use windows_sys::{
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
         Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
+        System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
     },
 };
@@ -25,6 +25,7 @@ use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct ServiceType: u32 {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = Services::SERVICE_FILE_SYSTEM_DRIVER;
@@ -51,6 +52,7 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
+    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
     pub struct ServiceAccess: u32 {
         /// Can query the service status
         const QUERY_STATUS = Services::SERVICE_QUERY_STATUS;
@@ -565,9 +567,9 @@ impl ServiceConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum HardwareProfileChangeParam {
-    ConfigChanged = SystemServices::DBT_CONFIGCHANGED,
-    QueryChangeConfig = SystemServices::DBT_QUERYCHANGECONFIG,
-    ConfigChangeCanceled = SystemServices::DBT_CONFIGCHANGECANCELED,
+    ConfigChanged = WindowsAndMessaging::DBT_CONFIGCHANGED,
+    QueryChangeConfig = WindowsAndMessaging::DBT_QUERYCHANGECONFIG,
+    ConfigChangeCanceled = WindowsAndMessaging::DBT_CONFIGCHANGECANCELED,
 }
 
 impl HardwareProfileChangeParam {
@@ -647,8 +649,8 @@ impl DisplayState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(i32)]
 pub enum UserStatus {
-    Present = SystemServices::PowerUserPresent,
-    Inactive = SystemServices::PowerUserInactive,
+    Present = Power::PowerUserPresent,
+    Inactive = Power::PowerUserInactive,
 }
 
 impl UserStatus {
@@ -1187,6 +1189,7 @@ impl<'a> From<&'a Services::SERVICE_STATUS_PROCESS> for ServiceExitCode {
 
 bitflags::bitflags! {
     /// Flags describing accepted types of service control events.
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct ServiceControlAccept: u32 {
         /// The service is a network component that can accept changes in its binding without being
         /// stopped and restarted. This allows service to receive `ServiceControl::Netbind*`
