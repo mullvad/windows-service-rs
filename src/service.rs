@@ -25,7 +25,7 @@ use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
-    #[derive(Debug, Clone, Hash, Eq, PartialEq, Copy)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceType: u32 {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = Services::SERVICE_FILE_SYSTEM_DRIVER;
@@ -52,7 +52,7 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
-    #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceAccess: u32 {
         /// Can query the service status
         const QUERY_STATUS = Services::SERVICE_QUERY_STATUS;
@@ -1189,7 +1189,7 @@ impl<'a> From<&'a Services::SERVICE_STATUS_PROCESS> for ServiceExitCode {
 
 bitflags::bitflags! {
     /// Flags describing accepted types of service control events.
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceControlAccept: u32 {
         /// The service is a network component that can accept changes in its binding without being
         /// stopped and restarted. This allows service to receive `ServiceControl::Netbind*`
