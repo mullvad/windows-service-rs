@@ -11,6 +11,7 @@ use crate::{Error, Result};
 
 bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, Hash)]
     pub struct ServiceManagerAccess: u32 {
         /// Can connect to service control manager.
         const CONNECT = Services::SC_MANAGER_CONNECT;
