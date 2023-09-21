@@ -85,6 +85,14 @@ mod ping_service {
                     ServiceControlHandlerResult::NoError
                 }
 
+                // treat the UserEvent as a stop request
+                ServiceControl::UserEvent(code) => {
+                    if code.to_raw() == 130 {
+                        shutdown_tx.send(()).unwrap();
+                    }
+                    ServiceControlHandlerResult::NoError
+                }
+
                 _ => ServiceControlHandlerResult::NotImplemented,
             }
         };
