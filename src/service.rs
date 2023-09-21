@@ -77,6 +77,9 @@ bitflags::bitflags! {
 
         /// Can change the services configuration
         const CHANGE_CONFIG = Services::SERVICE_CHANGE_CONFIG;
+
+        /// Can use user-defined control codes
+        const NOTIFY = Services::SERVICE_USER_DEFINED_CONTROL;
     }
 }
 
@@ -1004,6 +1007,37 @@ impl SessionChangeParam {
     }
 }
 
+/// Struct describing a user-defined control code (**128** to **255**)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct UserEventCode(u32); // invariant: always in 128..=255
+
+impl UserEventCode {
+    /// Mainly for declaring user events as constants:
+    ///
+    /// ```
+    /// # use windows_service::service::UserEventCode;
+    /// const MY_EVENT: UserEventCode = unsafe { UserEventCode::from_unchecked(130) };
+    /// ```
+    ///
+    /// # Safety
+    /// `raw` should be a valid user control code in the range of **128** to **255**.
+    pub const unsafe fn from_unchecked(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    pub fn from_raw(raw: u32) -> Result<UserEventCode, ParseRawError> {
+        match raw {
+            128..=255 => Ok(Self(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+
+    pub fn to_raw(&self) -> u32 {
+        self.0
+    }
+}
+
 /// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ServiceControl {
@@ -1023,6 +1057,7 @@ pub enum ServiceControl {
     SessionChange(SessionChangeParam),
     TimeChange,
     TriggerEvent,
+    UserEvent(UserEventCode),
 }
 
 impl ServiceControl {
@@ -1063,7 +1098,7 @@ impl ServiceControl {
             }
             Services::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             Services::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => UserEventCode::from_raw(raw).map(ServiceControl::UserEvent),
         }
     }
 
@@ -1087,6 +1122,7 @@ impl ServiceControl {
             ServiceControl::SessionChange(_) => Services::SERVICE_CONTROL_SESSIONCHANGE,
             ServiceControl::TimeChange => Services::SERVICE_CONTROL_TIMECHANGE,
             ServiceControl::TriggerEvent => Services::SERVICE_CONTROL_TRIGGEREVENT,
+            ServiceControl::UserEvent(event) => event.to_raw(),
         }
     }
 }
@@ -1435,6 +1471,11 @@ impl Service {
     /// Resume the paused service.
     pub fn resume(&self) -> crate::Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Continue)
+    }
+
+    /// Send user-defined control code.
+    pub fn notify(&self, code: UserEventCode) -> crate::Result<ServiceStatus> {
+        self.send_control_command(ServiceControl::UserEvent(code))
     }
 
     /// Get the service status from the system.
