@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Add support for user-defined control codes in services.
+  (See: `Service::notify` and `notify_service.rs` example)
 
 
 ## [0.6.0] - 2023-03-07
