@@ -35,6 +35,9 @@ jobs:
         uses: egor-tensin/setup-mingw@v2
         with:
           platform: ${{ matrix.platform }}
+          # Pinning a working version of MinGW since we've issues with the action using newer
+          # versions
+          version: 12.2.0.03042023
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1.0.6
