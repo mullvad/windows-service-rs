@@ -35,6 +35,7 @@ jobs:
         uses: egor-tensin/setup-mingw@v2
         with:
           platform: ${{ matrix.platform }}
+          version: 12.2.0.03042023
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1.0.6
