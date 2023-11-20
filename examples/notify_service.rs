@@ -22,7 +22,7 @@ fn main() -> windows_service::Result<()> {
 
     let service = service_manager.open_service(
         &service_name,
-        ServiceAccess::PAUSE_CONTINUE | ServiceAccess::NOTIFY,
+        ServiceAccess::PAUSE_CONTINUE | ServiceAccess::USER_DEFINED_CONTROL,
     )?;
 
     const NO_OP: UserEventCode = unsafe { UserEventCode::from_unchecked(128) };
