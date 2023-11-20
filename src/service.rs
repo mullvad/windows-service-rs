@@ -79,7 +79,7 @@ bitflags::bitflags! {
         const CHANGE_CONFIG = Services::SERVICE_CHANGE_CONFIG;
 
         /// Can use user-defined control codes
-        const NOTIFY = Services::SERVICE_USER_DEFINED_CONTROL;
+        const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
     }
 }
 
