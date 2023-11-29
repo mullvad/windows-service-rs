@@ -6,12 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
-- Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`.
-  (See: `LidSwitchStateChange`)
-
-### Added
 - Add support for user-defined control codes in services.
   (See: `Service::notify` and `notify_service.rs` example)
+- Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`.
+  (See: `LidSwitchStateChange`)
 
 
 ## [0.6.0] - 2023-03-07
