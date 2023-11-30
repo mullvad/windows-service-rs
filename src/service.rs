@@ -770,6 +770,29 @@ impl AwayModeState {
     }
 }
 
+/// Enum indicates the current lid switch state as
+/// the Data member of GUID_LIDSWITCH_STATE_CHANGE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum LidSwitchStateChange {
+    Closed = 0,
+    Open = 1,
+}
+
+impl LidSwitchStateChange {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<LidSwitchStateChange, ParseRawError> {
+        match raw {
+            x if x == LidSwitchStateChange::Closed.to_raw() => Ok(LidSwitchStateChange::Closed),
+            x if x == LidSwitchStateChange::Open.to_raw() => Ok(LidSwitchStateChange::Open),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
 /// Struct converted from Power::POWERBROADCAST_SETTING
 ///
 /// Please refer to MSDN for more info about the data members:
@@ -785,6 +808,7 @@ pub enum PowerBroadcastSetting {
     PowerSavingStatus(BatterySaverState),
     PowerSchemePersonality(PowerSchemePersonality),
     SystemAwayMode(AwayModeState),
+    LidSwitchStateChange(LidSwitchStateChange),
 }
 
 impl PowerBroadcastSetting {
@@ -848,6 +872,12 @@ impl PowerBroadcastSetting {
                 let away_mode_state = *(data as *const u32);
                 Ok(PowerBroadcastSetting::SystemAwayMode(
                     AwayModeState::from_raw(away_mode_state)?,
+                ))
+            }
+            x if is_equal_guid(x, &SystemServices::GUID_LIDSWITCH_STATE_CHANGE) => {
+                let lid_switch_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::LidSwitchStateChange(
+                    LidSwitchStateChange::from_raw(lid_switch_state)?,
                 ))
             }
             x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
