@@ -1644,6 +1644,21 @@ impl Service {
         Ok(raw_failure_actions_flag.fFailureActionsOnNonCrashFailures != 0)
     }
 
+    /// Query the system for the service's SID type information.
+    ///
+    /// The service must be open with the [`ServiceAccess::QUERY_CONFIG`]
+    /// access permission prior to calling this method.
+    pub fn get_config_service_sid_info(&self) -> crate::Result<ServiceSidType> {
+        let mut data = vec![0u8; u32::BITS as usize / 8];
+
+        // SAFETY: The structure we get back is `SERVICE_SID_INFO`. It has a
+        // single member that specifies the new SID type as a `u32`, and as
+        // such, we can get away with not explicitly creating a structure and
+        // instead re-using `ServiceSidType` that is `repr(u32)`.
+        unsafe { self.query_config2(Services::SERVICE_CONFIG_SERVICE_SID_INFO, &mut data) }
+            .map_err(Error::Winapi)
+    }
+
     pub fn set_config_service_sid_info(
         &self,
         mut service_sid_type: ServiceSidType,
