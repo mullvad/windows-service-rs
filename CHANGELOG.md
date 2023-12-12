@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (See: `Service::notify` and `notify_service.rs` example)
 - Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`.
   (See: `LidSwitchStateChange`)
+- Add function for obtaining service SID infos. (See: `Service::get_config_service_sid_info`).
 
 
 ## [0.6.0] - 2023-03-07
