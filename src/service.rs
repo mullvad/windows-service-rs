@@ -1667,11 +1667,16 @@ impl Service {
             .map_err(Error::Winapi)
     }
 
+    /// Require the system to set the service's SID type information to the
+    /// provided value.
+    ///
+    /// The service must be open with the [`ServiceAccess::CHANGE_CONFIG`]
+    /// access permission prior to calling this method.
     pub fn set_config_service_sid_info(
         &self,
         mut service_sid_type: ServiceSidType,
     ) -> crate::Result<()> {
-        // The structure we need to pass in is `SERVICE_SID_INFO`.
+        // SAFETY: The structure we need to pass in is `SERVICE_SID_INFO`.
         // It has a single member that specifies the new SID type, and as such,
         // we can get away with not explicitly creating a structure in Rust.
         unsafe {
