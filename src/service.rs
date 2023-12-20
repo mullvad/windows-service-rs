@@ -93,9 +93,11 @@ pub enum ServiceStartType {
     OnDemand = Services::SERVICE_DEMAND_START,
     /// Disabled service
     Disabled = Services::SERVICE_DISABLED,
-    /// Start on system startup
+    /// Driver start on system startup.
+    /// This start type is only applicable to driver services.
     SystemStart = Services::SERVICE_SYSTEM_START,
-    /// Start on OS boot
+    /// Driver start on OS boot.
+    /// This start type is only applicable to driver services.
     BootStart = Services::SERVICE_BOOT_START,
 }
 
