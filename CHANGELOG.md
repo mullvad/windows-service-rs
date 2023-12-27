@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (See: `Service::notify` and `notify_service.rs` example)
 - Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`.
   (See: `LidSwitchStateChange`)
+- Add function for obtaining service SID infos. (See: `Service::get_config_service_sid_info`).
 
 
 ## [0.6.0] - 2023-03-07
@@ -21,8 +22,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - Breaking: Consolidate `Error` type. Remove dependency on `err-derive`.
-- Breaking: `Service::delete` does not consume `self` any longer. Make sure to `drop` a reference 
-  to `Service` manually if you plan to poll SCM synchronously to determine when the service is 
+- Breaking: `Service::delete` does not consume `self` any longer. Make sure to `drop` a reference
+  to `Service` manually if you plan to poll SCM synchronously to determine when the service is
   removed from system. (See `uninstall_service.rs` example)
 
 
@@ -41,8 +42,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.4.0] - 2021-08-12
 ### Changed
-- Breaking: `ServiceDependency::from_system_identifier()`, `ServiceManager::new()`, 
-  `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take 
+- Breaking: `ServiceDependency::from_system_identifier()`, `ServiceManager::new()`,
+  `ServiceManager::local_computer()`, `ServiceManager::remote_computer()` now take
   `impl AsRef<OsStr>` arguments.
 - Upgrade err-derive dependency to 0.3.0
 - `ServiceStatusHandle` is now Sync.
@@ -64,9 +65,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Add support for configuring the service SID info.
 - Add support for changing mandatory configuration settings on service.
-- Add support for service failure actions. (See: `ServiceFailureActions`, 
-  `Service::update_failure_actions`, `Service::get_failure_actions`, 
-  `Service::set_failure_actions_on_non_crash_failures`, 
+- Add support for service failure actions. (See: `ServiceFailureActions`,
+  `Service::update_failure_actions`, `Service::get_failure_actions`,
+  `Service::set_failure_actions_on_non_crash_failures`,
   `Service::get_failure_actions_on_non_crash_failures`)
 - Add support to pause and continue services. (See: `Service::pause` and `Service::resume`)
 - Use `QueryServiceStatusEx` when querying service status. Allows getting the process ID of a
