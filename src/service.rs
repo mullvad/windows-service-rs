@@ -86,7 +86,6 @@ bitflags::bitflags! {
 /// Enum describing the start options for windows services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
-#[non_exhaustive]
 pub enum ServiceStartType {
     /// Autostart on system startup
     AutoStart = Services::SERVICE_AUTO_START,
