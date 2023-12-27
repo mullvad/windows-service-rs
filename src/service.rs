@@ -93,6 +93,12 @@ pub enum ServiceStartType {
     OnDemand = Services::SERVICE_DEMAND_START,
     /// Disabled service
     Disabled = Services::SERVICE_DISABLED,
+    /// Driver start on system startup.
+    /// This start type is only applicable to driver services.
+    SystemStart = Services::SERVICE_SYSTEM_START,
+    /// Driver start on OS boot.
+    /// This start type is only applicable to driver services.
+    BootStart = Services::SERVICE_BOOT_START,
 }
 
 impl ServiceStartType {
@@ -105,6 +111,8 @@ impl ServiceStartType {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
+            x if x == ServiceStartType::SystemStart.to_raw() => Ok(ServiceStartType::SystemStart),
+            x if x == ServiceStartType::BootStart.to_raw() => Ok(ServiceStartType::BootStart),
             _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
