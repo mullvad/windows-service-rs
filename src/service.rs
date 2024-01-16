@@ -14,6 +14,7 @@ use windows_sys::{
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
         Storage::FileSystem,
+        Security,
         System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
     },
@@ -1841,6 +1842,10 @@ impl Service {
             self.change_config2(Services::SERVICE_CONFIG_PRESHUTDOWN_INFO, &mut timeout)
                 .map_err(Error::Winapi)
         }
+    }
+
+    pub fn raw_service_handle(&self) -> Security::SC_HANDLE {
+        self.service_handle.raw_handle()
     }
 
     /// Private helper to send the control commands to the system.
