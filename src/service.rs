@@ -81,6 +81,9 @@ bitflags::bitflags! {
 
         /// Can use user-defined control codes
         const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
+
+        /// Full access to the service object
+        const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
     }
 }
 
