@@ -1442,6 +1442,11 @@ impl Service {
         Service { service_handle }
     }
 
+    /// Provides access to the underlying system service handle
+    pub fn raw_handle(&self) -> Security::SC_HANDLE {
+        self.service_handle.raw_handle()
+    }
+
     /// Start the service.
     ///
     /// # Example
@@ -1845,10 +1850,6 @@ impl Service {
             self.change_config2(Services::SERVICE_CONFIG_PRESHUTDOWN_INFO, &mut timeout)
                 .map_err(Error::Winapi)
         }
-    }
-
-    pub fn raw_service_handle(&self) -> Security::SC_HANDLE {
-        self.service_handle.raw_handle()
     }
 
     /// Private helper to send the control commands to the system.

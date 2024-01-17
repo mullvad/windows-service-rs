@@ -22,6 +22,7 @@ bitflags::bitflags! {
         /// Can enumerate services or receive notifications.
         const ENUMERATE_SERVICE = Services::SC_MANAGER_ENUMERATE_SERVICE;
 
+        /// Includes all possible access rights.
         const ALL_ACCESS = Services::SC_MANAGER_ALL_ACCESS;
     }
 }
