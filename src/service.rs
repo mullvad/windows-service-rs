@@ -13,6 +13,7 @@ use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
+        Security,
         Storage::FileSystem,
         System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
@@ -80,6 +81,9 @@ bitflags::bitflags! {
 
         /// Can use user-defined control codes
         const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
+
+        /// Full access to the service object
+        const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
     }
 }
 
@@ -1436,6 +1440,11 @@ pub struct Service {
 impl Service {
     pub(crate) fn new(service_handle: ScHandle) -> Self {
         Service { service_handle }
+    }
+
+    /// Provides access to the underlying system service handle
+    pub fn raw_handle(&self) -> Security::SC_HANDLE {
+        self.service_handle.raw_handle()
     }
 
     /// Start the service.
