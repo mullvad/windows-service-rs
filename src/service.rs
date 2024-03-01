@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::convert::TryFrom;
+
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
