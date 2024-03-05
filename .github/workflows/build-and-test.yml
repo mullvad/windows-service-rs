@@ -22,7 +22,8 @@ jobs:
           - target: x86_64-pc-windows-msvc
             rust: nightly
           # MSRV. Bumping this is not treated as a breaknig change,
-          # but it should be mentioned in the changelog.
+          # but it should be mentioned in the changelog,
+          # and `rust-version` in Cargo.toml should be updated.
           - target: x86_64-pc-windows-msvc
             rust: 1.58.0
 
