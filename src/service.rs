@@ -8,6 +8,7 @@ use std::time::Duration;
 use std::{io, mem};
 
 use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
+use windows_sys::Win32::Storage::FileSystem::WRITE_DAC;
 use windows_sys::{
     core::GUID,
     Win32::{
@@ -80,6 +81,9 @@ bitflags::bitflags! {
 
         /// Can use user-defined control codes
         const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
+
+        /// Can update the DAC, required for SetServiceObjectSecurity()
+        const WRITE_DAC = WRITE_DAC;
 
         /// Full access to the service object
         const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
