@@ -809,6 +809,7 @@ impl LidSwitchStateChange {
 /// Please refer to MSDN for more info about the data members:
 /// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerBroadcastSetting {
     AcdcPowerSource(PowerSource),
     BatteryPercentageRemaining(u32),
