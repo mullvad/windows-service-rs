@@ -899,6 +899,7 @@ impl PowerBroadcastSetting {
 
 /// Enum describing the PowerEvent event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerEventParam {
     PowerStatusChange,
     ResumeAutomatic,
