@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add support for `SERVICE_SYSTEM_START` and `SERVICE_BOOT_START` to in service start type
 - Add function for obtaining service SID infos. (See: `Service::get_config_service_sid_info`).
 
+### Changed
+- Breaking: Upgrade `windows-sys` dependency to 0.52
+
 
 ## [0.6.0] - 2023-03-07
 ### Added
