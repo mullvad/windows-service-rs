@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (See: `LidSwitchStateChange`)
 - Add function for obtaining service SID infos. (See: `Service::get_config_service_sid_info`).
 
+### Changed
+- Breaking: Make a bunch of enums `#[non_exhaustive]`. `Error`, `SessionChangeReason`,
+  `PowerBroadcastSetting`, `PowerEventParam`, `SessionChangeReason` and `ServiceControl`.
+
 
 ## [0.6.0] - 2023-03-07
 ### Added
