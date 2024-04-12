@@ -1081,6 +1081,7 @@ impl UserEventCode {
 
 /// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ServiceControl {
     Continue,
     Interrogate,
