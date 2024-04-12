@@ -947,6 +947,7 @@ impl PowerEventParam {
 
 /// Enum describing the reason of a SessionChange event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 #[repr(u32)]
 pub enum SessionChangeReason {
     ConsoleConnect = WindowsAndMessaging::WTS_CONSOLE_CONNECT,
