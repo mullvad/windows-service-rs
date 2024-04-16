@@ -5,16 +5,23 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+
+## [0.7.0] - 2024-04-12
 ### Added
-- Add support for user-defined control codes in services.
-  (See: `Service::notify` and `notify_service.rs` example)
-- Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`.
-  (See: `LidSwitchStateChange`)
+- Breaking: Add support for user-defined control codes in services.
+  (See: `Service::notify` and `notify_service.rs` example). This is breaking since
+  the `ServiceControl` enum was exhaustive in version 0.6.0.
+- Breaking: Add support for `LidSwitchStateChange` in `PowerBroadcastSetting`. This is breaking
+  since `PowerBroadcastSetting` was an exhaustive enum in version 0.6.0.
+- Breaking: Add support for `SERVICE_SYSTEM_START` and `SERVICE_BOOT_START` in service
+  start type. This is breaking since the `ServiceStartType` enum is exhaustive.
 - Add function for obtaining service SID infos. (See: `Service::get_config_service_sid_info`).
 
 ### Changed
 - Breaking: Make a bunch of enums `#[non_exhaustive]`: `Error`, `PowerBroadcastSetting`,
-  `PowerEventParam`, `SessionChangeReason` and `ServiceControl`.
+  `PowerEventParam` and `ServiceControl`.
+- Breaking: Upgrade `windows-sys` dependency to 0.52
 
 
 ## [0.6.0] - 2023-03-07
