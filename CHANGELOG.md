@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - Breaking: Make a bunch of enums `#[non_exhaustive]`: `Error`, `PowerBroadcastSetting`,
-  `PowerEventParam`, `SessionChangeReason` and `ServiceControl`.
+  `PowerEventParam` and `ServiceControl`.
 - Breaking: Upgrade `windows-sys` dependency to 0.52
 
 
