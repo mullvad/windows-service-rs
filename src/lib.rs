@@ -179,6 +179,7 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// Kernel drivers do not support launch arguments
     LaunchArgumentsNotSupported,

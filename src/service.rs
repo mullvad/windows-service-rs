@@ -809,6 +809,7 @@ impl LidSwitchStateChange {
 /// Please refer to MSDN for more info about the data members:
 /// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerBroadcastSetting {
     AcdcPowerSource(PowerSource),
     BatteryPercentageRemaining(u32),
@@ -898,6 +899,7 @@ impl PowerBroadcastSetting {
 
 /// Enum describing the PowerEvent event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerEventParam {
     PowerStatusChange,
     ResumeAutomatic,
@@ -1081,6 +1083,7 @@ impl UserEventCode {
 
 /// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ServiceControl {
     Continue,
     Interrogate,
