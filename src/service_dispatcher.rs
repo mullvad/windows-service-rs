@@ -39,7 +39,7 @@ macro_rules! define_windows_service {
     ($function_name:ident, $service_main_handler:ident) => {
         /// Static callback used by the system to bootstrap the service.
         /// Do not call it directly.
-        extern "system" fn $function_name(
+        pub(crate) extern "system" fn $function_name(
             num_service_arguments: u32,
             service_arguments: *mut *mut u16,
         ) {
