@@ -216,7 +216,7 @@ impl std::fmt::Display for Error {
                 "{} contains a nul byte in element at {} index",
                 name, index
             ),
-            Self::Winapi(_) => write!(f, "IO error in winapi call"),
+            Self::Winapi(io_err) => write!(f, "IO error in winapi call: {}", io_err),
         }
     }
 }
