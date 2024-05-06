@@ -54,6 +54,9 @@ bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceAccess: u32 {
+        /// Full access to the service object
+        const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
+
         /// Can query the service status
         const QUERY_STATUS = Services::SERVICE_QUERY_STATUS;
 
@@ -69,9 +72,6 @@ bitflags::bitflags! {
         /// Can ask the service to report its status
         const INTERROGATE = Services::SERVICE_INTERROGATE;
 
-        /// Can delete the service
-        const DELETE = FileSystem::DELETE;
-
         /// Can query the services configuration
         const QUERY_CONFIG = Services::SERVICE_QUERY_CONFIG;
 
@@ -81,8 +81,17 @@ bitflags::bitflags! {
         /// Can use user-defined control codes
         const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
 
-        /// Full access to the service object
-        const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
+        /// Can delete the service
+        const DELETE = FileSystem::DELETE;
+
+        /// Required to call the `QueryServiceObjectSecurity` function to query the security descriptor of the service object
+        const READ_CONTROL = FileSystem::READ_CONTROL;
+
+        /// Required to call the `SetServiceObjectSecurity` function to modify the Dacl member of the service object's security descriptor
+        const WRITE_DAC = FileSystem::WRITE_DAC;
+
+        /// Required to call the `SetServiceObjectSecurity` function to modify the Owner and Group members of the service object's security descriptor
+        const WRITE_OWNER = FileSystem::WRITE_OWNER;
     }
 }
 
