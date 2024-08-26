@@ -954,6 +954,50 @@ impl PowerEventParam {
     }
 }
 
+/// Enum describing the type of DeviceEvent event.
+///
+/// In order to receive those events, `RegisterDeviceNotification` must be called first.
+/// See <https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerdevicenotificationw>.
+///
+/// The value of each variant corresponds to the event data, which is kept in raw form as it can
+/// be quite complex. Please refer to the `lParam` documentation here for more details on this data:
+/// <https://learn.microsoft.com/en-us/windows/win32/devio/wm-devicechange>.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DeviceEventParam {
+    DeviceArrival(*const c_void),
+    DeviceRemoveComplete(*const c_void),
+    DeviceQueryRemove(*const c_void),
+    DeviceQueryRemoveFailed(*const c_void),
+    DeviceRemovePending(*const c_void),
+    CustomEvent(*const c_void),
+}
+
+impl DeviceEventParam {
+    /// Extract DeviceEventParam from `event_type` and `event_data`
+    pub fn from_event(event_type: u32, event_data: *mut c_void) -> Result<Self, ParseRawError> {
+        match event_type {
+            WindowsAndMessaging::DBT_DEVICEARRIVAL => {
+                Ok(DeviceEventParam::DeviceArrival(event_data))
+            }
+            WindowsAndMessaging::DBT_DEVICEREMOVECOMPLETE => {
+                Ok(DeviceEventParam::DeviceRemoveComplete(event_data))
+            }
+            WindowsAndMessaging::DBT_DEVICEQUERYREMOVE => {
+                Ok(DeviceEventParam::DeviceQueryRemove(event_data))
+            }
+            WindowsAndMessaging::DBT_DEVICEQUERYREMOVEFAILED => {
+                Ok(DeviceEventParam::DeviceQueryRemoveFailed(event_data))
+            }
+            WindowsAndMessaging::DBT_DEVICEREMOVEPENDING => {
+                Ok(DeviceEventParam::DeviceRemovePending(event_data))
+            }
+            WindowsAndMessaging::DBT_CUSTOMEVENT => Ok(DeviceEventParam::CustomEvent(event_data)),
+            _ => Err(ParseRawError::InvalidInteger(event_type)),
+        }
+    }
+}
+
 /// Enum describing the reason of a SessionChange event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -1105,6 +1149,7 @@ pub enum ServiceControl {
     Preshutdown,
     Shutdown,
     Stop,
+    DeviceEvent(DeviceEventParam),
     HardwareProfileChange(HardwareProfileChangeParam),
     PowerEvent(PowerEventParam),
     SessionChange(SessionChangeParam),
@@ -1138,6 +1183,10 @@ impl ServiceControl {
             Services::SERVICE_CONTROL_PRESHUTDOWN => Ok(ServiceControl::Preshutdown),
             Services::SERVICE_CONTROL_SHUTDOWN => Ok(ServiceControl::Shutdown),
             Services::SERVICE_CONTROL_STOP => Ok(ServiceControl::Stop),
+            Services::SERVICE_CONTROL_DEVICEEVENT => {
+                DeviceEventParam::from_event(event_type, event_data)
+                    .map(ServiceControl::DeviceEvent)
+            }
             Services::SERVICE_CONTROL_HARDWAREPROFILECHANGE => {
                 HardwareProfileChangeParam::from_raw(event_type)
                     .map(ServiceControl::HardwareProfileChange)
@@ -1168,6 +1217,7 @@ impl ServiceControl {
             ServiceControl::Preshutdown => Services::SERVICE_CONTROL_PRESHUTDOWN,
             ServiceControl::Shutdown => Services::SERVICE_CONTROL_SHUTDOWN,
             ServiceControl::Stop => Services::SERVICE_CONTROL_STOP,
+            ServiceControl::DeviceEvent { .. } => Services::SERVICE_CONTROL_DEVICEEVENT,
             ServiceControl::HardwareProfileChange(_) => {
                 Services::SERVICE_CONTROL_HARDWAREPROFILECHANGE
             }
