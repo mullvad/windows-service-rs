@@ -57,7 +57,7 @@ impl ServiceManager {
             )
         };
 
-        if handle == 0 {
+        if handle.is_null() {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(ServiceManager {
@@ -168,7 +168,7 @@ impl ServiceManager {
             )
         };
 
-        if service_handle == 0 {
+        if service_handle.is_null() {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))
@@ -209,7 +209,7 @@ impl ServiceManager {
             )
         };
 
-        if service_handle == 0 {
+        if service_handle.is_null() {
             Err(Error::Winapi(io::Error::last_os_error()))
         } else {
             Ok(Service::new(unsafe { ScHandle::new(service_handle) }))

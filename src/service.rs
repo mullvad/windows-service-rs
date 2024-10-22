@@ -12,7 +12,6 @@ use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
-        Security,
         Storage::FileSystem,
         System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
@@ -1454,7 +1453,7 @@ impl Service {
     }
 
     /// Provides access to the underlying system service handle
-    pub fn raw_handle(&self) -> Security::SC_HANDLE {
+    pub fn raw_handle(&self) -> Services::SC_HANDLE {
         self.service_handle.raw_handle()
     }
 
