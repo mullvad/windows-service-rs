@@ -1,15 +1,15 @@
-use windows_sys::Win32::{Security, System::Services};
+use windows_sys::Win32::System::Services;
 
-/// A handle holder that wraps a low level [`Security::SC_HANDLE`].
-pub(crate) struct ScHandle(Security::SC_HANDLE);
+/// A handle holder that wraps a low level [`Services::SC_HANDLE`].
+pub(crate) struct ScHandle(Services::SC_HANDLE);
 
 impl ScHandle {
-    pub(crate) unsafe fn new(handle: Security::SC_HANDLE) -> Self {
+    pub(crate) unsafe fn new(handle: Services::SC_HANDLE) -> Self {
         ScHandle(handle)
     }
 
-    /// Returns underlying [`Security::SC_HANDLE`].
-    pub(crate) fn raw_handle(&self) -> Security::SC_HANDLE {
+    /// Returns underlying [`Services::SC_HANDLE`].
+    pub(crate) fn raw_handle(&self) -> Services::SC_HANDLE {
         self.0
     }
 }

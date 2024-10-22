@@ -123,7 +123,7 @@ where
         )
     };
 
-    if status_handle == 0 {
+    if status_handle.is_null() {
         // Release the `event_handler` in case of an error.
         let _: Box<F> = unsafe { Box::from_raw(context) };
         Err(Error::Winapi(io::Error::last_os_error()))
