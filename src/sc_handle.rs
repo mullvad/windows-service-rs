@@ -1,6 +1,6 @@
 use windows_sys::Win32::System::Services;
 
-/// A handle holder that wraps a low level [`Security::SC_HANDLE`].
+/// A handle holder that wraps a low level [`Services::SC_HANDLE`].
 pub(crate) struct ScHandle(Services::SC_HANDLE);
 
 impl ScHandle {
@@ -8,7 +8,7 @@ impl ScHandle {
         ScHandle(handle)
     }
 
-    /// Returns underlying [`Security::SC_HANDLE`].
+    /// Returns underlying [`Services::SC_HANDLE`].
     pub(crate) fn raw_handle(&self) -> Services::SC_HANDLE {
         self.0
     }
