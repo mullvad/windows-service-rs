@@ -209,14 +209,14 @@ impl std::fmt::Display for Error {
             Self::LaunchArgumentsNotSupported => {
                 write!(f, "kernel drivers do not support launch arguments")
             }
-            Self::ParseValue(name, _) => write!(f, "invalid {} value", name),
+            Self::ParseValue(name, e) => write!(f, "invalid {} value. Err: {} ", name, e),
             Self::ArgumentHasNulByte(name) => write!(f, "{} contains a nul byte", name),
             Self::ArgumentArrayElementHasNulByte(name, index) => write!(
                 f,
                 "{} contains a nul byte in element at {} index",
                 name, index
             ),
-            Self::Winapi(_) => write!(f, "IO error in winapi call"),
+            Self::Winapi(e) => write!(f, "IO error in winapi call: {}", e),
         }
     }
 }
