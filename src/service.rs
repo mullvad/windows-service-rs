@@ -46,6 +46,9 @@ bitflags::bitflags! {
 
         /// The service can be interactive.
         const INTERACTIVE_PROCESS = SystemServices::SERVICE_INTERACTIVE_PROCESS;
+
+        /// Packaged Service that runs in its own process.
+        const OWN_PKG_PROCESS = SystemServices::SERVICE_PKG_SERVICE;
     }
 }
 
