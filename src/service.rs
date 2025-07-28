@@ -366,31 +366,34 @@ impl ServiceFailureActions {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum ServiceLaunchProtected {
+    /// No launch protection. The service can be modified or replaced without restriction.
     None = Services::SERVICE_LAUNCH_PROTECTED_NONE,
+
+    /// Launch protection for Windows components.
     Windows = Services::SERVICE_LAUNCH_PROTECTED_WINDOWS,
+
+    /// A lighter version of Windows launch protection.
     WindowsLight = Services::SERVICE_LAUNCH_PROTECTED_WINDOWS_LIGHT,
+
+    /// Launch protection used by antimalware (ELAM) services.
     AntimalwareLight = Services::SERVICE_LAUNCH_PROTECTED_ANTIMALWARE_LIGHT,
 }
-impl ServiceLaunchProtected {
-    pub fn to_raw(&self) -> u32 {
-        *self as u32
-    }
+impl TryFrom<u32> for ServiceLaunchProtected {
+    type Error = Error;
 
-    pub fn from_raw(raw: u32) -> crate::Result<ServiceLaunchProtected> {
-        match raw {
-            x if x == ServiceLaunchProtected::None.to_raw() => Ok(ServiceLaunchProtected::None),
-            x if x == ServiceLaunchProtected::Windows.to_raw() => {
-                Ok(ServiceLaunchProtected::Windows)
-            }
-            x if x == ServiceLaunchProtected::WindowsLight.to_raw() => {
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            Services::SERVICE_LAUNCH_PROTECTED_NONE => Ok(ServiceLaunchProtected::None),
+            Services::SERVICE_LAUNCH_PROTECTED_WINDOWS => Ok(ServiceLaunchProtected::Windows),
+            Services::SERVICE_LAUNCH_PROTECTED_WINDOWS_LIGHT => {
                 Ok(ServiceLaunchProtected::WindowsLight)
             }
-            x if x == ServiceLaunchProtected::AntimalwareLight.to_raw() => {
+            Services::SERVICE_LAUNCH_PROTECTED_ANTIMALWARE_LIGHT => {
                 Ok(ServiceLaunchProtected::AntimalwareLight)
             }
             _ => Err(Error::ParseValue(
                 "Invalid launch protection value",
-                ParseRawError::InvalidInteger(raw),
+                ParseRawError::InvalidInteger(value),
             )),
         }
     }
@@ -1846,7 +1849,7 @@ impl Service {
     pub fn set_launch_protected(&self, protection: ServiceLaunchProtected) -> crate::Result<()> {
         let mut launch_protected =
             unsafe { mem::zeroed::<Services::SERVICE_LAUNCH_PROTECTED_INFO>() };
-        launch_protected.dwLaunchProtected = protection.to_raw();
+        launch_protected.dwLaunchProtected = protection as u32;
         unsafe {
             self.change_config2(
                 Services::SERVICE_CONFIG_LAUNCH_PROTECTED,
@@ -1855,15 +1858,16 @@ impl Service {
             .map_err(Error::Winapi)
         }
     }
+    
     /// Get service launch protection.
     /// This is a security feature that allows the service to run in a more secure environment.
     pub fn get_launch_protected(&self) -> crate::Result<ServiceLaunchProtected> {
-        let mut data = vec![0u8; std::mem::size_of::<Services::SERVICE_LAUNCH_PROTECTED_INFO>()];
+        let mut data = [0u8; std::mem::size_of::<Services::SERVICE_LAUNCH_PROTECTED_INFO>()];
         unsafe {
             let raw_data: Services::SERVICE_LAUNCH_PROTECTED_INFO = self
                 .query_config2(Services::SERVICE_CONFIG_LAUNCH_PROTECTED, &mut data)
                 .map_err(Error::Winapi)?;
-            ServiceLaunchProtected::from_raw(raw_data.dwLaunchProtected)
+            raw_data.dwLaunchProtected.try_into()
         }
     }
 
