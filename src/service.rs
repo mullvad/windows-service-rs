@@ -1943,13 +1943,13 @@ impl std::fmt::Display for ParseRawError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidInteger(u) => {
-                write!(f, "invalid unsigned integer for the target type: {}", u)
+                write!(f, "invalid unsigned integer for the target type: {u}")
             }
             Self::InvalidIntegerSigned(i) => {
-                write!(f, "invalid signed integer for the target type: {}", i)
+                write!(f, "invalid signed integer for the target type: {i}")
             }
             Self::InvalidGuid(guid) => {
-                write!(f, "invalid GUID value for the target type: {}", guid)
+                write!(f, "invalid GUID value for the target type: {guid}")
             }
         }
     }
