@@ -1989,6 +1989,20 @@ fn escape_wide(s: impl AsRef<OsStr>) -> ::std::result::Result<WideString, Contai
     Ok(wide.to_ustring())
 }
 
+/// Returns whether this process is running as a service
+pub fn is_running_as_service() -> crate::Result<bool> {
+    let pid = std::process::id();
+
+    let mut session_id = 0u32;
+
+    let success = unsafe { RemoteDesktop::ProcessIdToSessionId(pid, &raw mut session_id) };
+    if success == 0 {
+        Err(Error::Winapi(io::Error::last_os_error()))
+    } else {
+        Ok(session_id == 0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
