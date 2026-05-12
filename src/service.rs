@@ -359,6 +359,45 @@ impl ServiceFailureActions {
     }
 }
 
+/// Enum describing the service launch protection options.
+///
+/// See <https://learn.microsoft.com/ko-kr/windows/win32/api/winsvc/ns-winsvc-service_launch_protected_info>
+/// for more information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum ServiceLaunchProtected {
+    /// No launch protection. The service can be modified or replaced without restriction.
+    None = Services::SERVICE_LAUNCH_PROTECTED_NONE,
+
+    /// Launch protection for Windows components.
+    Windows = Services::SERVICE_LAUNCH_PROTECTED_WINDOWS,
+
+    /// A lighter version of Windows launch protection.
+    WindowsLight = Services::SERVICE_LAUNCH_PROTECTED_WINDOWS_LIGHT,
+
+    /// Launch protection used by antimalware (ELAM) services.
+    AntimalwareLight = Services::SERVICE_LAUNCH_PROTECTED_ANTIMALWARE_LIGHT,
+}
+impl TryFrom<u32> for ServiceLaunchProtected {
+    type Error = Error;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            Services::SERVICE_LAUNCH_PROTECTED_NONE => Ok(ServiceLaunchProtected::None),
+            Services::SERVICE_LAUNCH_PROTECTED_WINDOWS => Ok(ServiceLaunchProtected::Windows),
+            Services::SERVICE_LAUNCH_PROTECTED_WINDOWS_LIGHT => {
+                Ok(ServiceLaunchProtected::WindowsLight)
+            }
+            Services::SERVICE_LAUNCH_PROTECTED_ANTIMALWARE_LIGHT => {
+                Ok(ServiceLaunchProtected::AntimalwareLight)
+            }
+            _ => Err(Error::ParseValue(
+                "Invalid launch protection value",
+                ParseRawError::InvalidInteger(value),
+            )),
+        }
+    }
+}
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceInfo {
@@ -1799,6 +1838,36 @@ impl Service {
                 &mut raw_failure_actions,
             )
             .map_err(Error::Winapi)
+        }
+    }
+
+    /// Set service launch protection.
+    /// This is a security feature that allows the service to run in a more secure environment.
+    /// there is no example because you need EV Certification and ELAM Driver to test it.
+    /// Please refer to the official documentation for more information:
+    /// <https://learn.microsoft.com/en-us/windows/win32/services/protecting-anti-malware-services->
+    pub fn set_launch_protected(&self, protection: ServiceLaunchProtected) -> crate::Result<()> {
+        let mut launch_protected =
+            unsafe { mem::zeroed::<Services::SERVICE_LAUNCH_PROTECTED_INFO>() };
+        launch_protected.dwLaunchProtected = protection as u32;
+        unsafe {
+            self.change_config2(
+                Services::SERVICE_CONFIG_LAUNCH_PROTECTED,
+                &mut launch_protected,
+            )
+            .map_err(Error::Winapi)
+        }
+    }
+    
+    /// Get service launch protection.
+    /// This is a security feature that allows the service to run in a more secure environment.
+    pub fn get_launch_protected(&self) -> crate::Result<ServiceLaunchProtected> {
+        let mut data = [0u8; std::mem::size_of::<Services::SERVICE_LAUNCH_PROTECTED_INFO>()];
+        unsafe {
+            let raw_data: Services::SERVICE_LAUNCH_PROTECTED_INFO = self
+                .query_config2(Services::SERVICE_CONFIG_LAUNCH_PROTECTED, &mut data)
+                .map_err(Error::Winapi)?;
+            raw_data.dwLaunchProtected.try_into()
         }
     }
 
