@@ -287,7 +287,7 @@ impl ServiceManager {
         let group_name = group_name
             .map(|name| {
                 WideCString::from_os_str(name.as_ref())
-                    .map_err(|_| Error::ArgumentHasNulByte("options.group_name"))
+                    .map_err(|_| Error::ArgumentHasNulByte("group_name"))
             })
             .transpose()?;
 
