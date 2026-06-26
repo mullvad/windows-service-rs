@@ -227,6 +227,7 @@ pub mod service_control_handler;
 pub mod service_manager;
 #[macro_use]
 pub mod service_dispatcher;
+pub mod service_enum;
 
 mod double_nul_terminated;
 mod shell_escape;
