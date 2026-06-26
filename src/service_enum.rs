@@ -1,5 +1,5 @@
 use std::{
-    alloc::{dealloc, Layout},
+    alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout},
     fmt::Debug,
     ops::Deref,
     ptr::NonNull,
@@ -36,6 +36,28 @@ impl Drop for RawEnumServices {
         unsafe {
             dealloc(self.buffer.as_ptr(), Self::layout(self.buffer_size));
         }
+    }
+}
+
+impl Clone for RawEnumServices {
+    fn clone(&self) -> Self {
+        let layout = Self::layout(self.buffer_size);
+        // SAFETY: `self.buffer_size` is non-zero
+        let Some(new_buffer) = NonNull::new(unsafe { alloc_zeroed(layout) }) else {
+            handle_alloc_error(layout);
+        };
+
+        // SAFETY: both pointers are valid and cannot overlap as `new_buffer` is a new allocation.
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                self.buffer.as_ptr(),
+                new_buffer.as_ptr(),
+                self.buffer_size,
+            )
+        };
+
+        // SAFETY: `new_buffer` has been initialized with the exact same data as `self.buffer` which itself is valid.
+        unsafe { Self::from_parts(new_buffer, self.buffer_size, self.service_count) }
     }
 }
 
