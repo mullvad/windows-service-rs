@@ -1,6 +1,7 @@
 use std::{
     alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout},
     fmt::Debug,
+    num::NonZeroUsize,
     ops::Deref,
     ptr::NonNull,
 };
@@ -16,72 +17,88 @@ use crate::{service::ServiceStatus, Error};
 
 /* -------------------------------------------------------------------------- */
 
-/// A buffer that contains a list of [`RawEnumServiceStatus`].
-pub struct RawEnumServices {
-    // INVARIANT(safety): allocated with the global allocated using the layout returned by `EnumServices::layout`
-    buffer: NonNull<u8>,
-    // INVARIANT(safety): the size in bytes passed to `EnumServices::layout` to allocate `buffer`
-    buffer_size: usize,
-    service_count: usize,
+/// A buffer with an alignement of `align_of::<ENUM_SERVICE_STATUS_PROCESSW>()`.
+pub(crate) struct Buffer {
+    ptr: NonNull<u8>,
+    size: NonZeroUsize,
 }
 
-// SAFETY: `RawEnumServices` is like a `Box<[ENUM_SERVICE_STATUS_PROCESSW]>`
-unsafe impl Send for RawEnumServices {}
-// SAFETY: `RawEnumServices` is like a `Box<[ENUM_SERVICE_STATUS_PROCESSW]>`
-unsafe impl Sync for RawEnumServices {}
+// SAFETY: `Buffer` is like a `Box<[u8]>`
+unsafe impl Send for Buffer {}
+// SAFETY: `Buffer` is like a `Box<[u8]>`
+unsafe impl Sync for Buffer {}
 
-impl Drop for RawEnumServices {
+impl Drop for Buffer {
     fn drop(&mut self) {
         // SAFETY: `buffer` has been allocated via the global allocator with this layout
         unsafe {
-            dealloc(self.buffer.as_ptr(), Self::layout(self.buffer_size));
+            dealloc(self.ptr.as_ptr(), Self::layout(self.size));
         }
     }
 }
 
-impl Clone for RawEnumServices {
+impl Clone for Buffer {
     fn clone(&self) -> Self {
-        let layout = Self::layout(self.buffer_size);
-        // SAFETY: `self.buffer_size` is non-zero
-        let Some(new_buffer) = NonNull::new(unsafe { alloc_zeroed(layout) }) else {
-            handle_alloc_error(layout);
-        };
+        let new_buffer = Self::alloc_zeroed(self.size);
 
         // SAFETY: both pointers are valid and cannot overlap as `new_buffer` is a new allocation.
         unsafe {
             core::ptr::copy_nonoverlapping(
-                self.buffer.as_ptr(),
-                new_buffer.as_ptr(),
-                self.buffer_size,
+                self.ptr.as_ptr(),
+                new_buffer.ptr.as_ptr(),
+                self.size.get(),
             )
         };
 
-        // SAFETY: `new_buffer` has been initialized with the exact same data as `self.buffer` which itself is valid.
-        unsafe { Self::from_parts(new_buffer, self.buffer_size, self.service_count) }
+        new_buffer
     }
 }
 
-impl RawEnumServices {
-    pub(crate) fn layout(required_size: usize) -> Layout {
-        Layout::from_size_align(required_size, align_of::<ENUM_SERVICE_STATUS_PROCESSW>()).unwrap()
+impl Buffer {
+    fn layout(size: NonZeroUsize) -> Layout {
+        Layout::from_size_align(size.get(), align_of::<ENUM_SERVICE_STATUS_PROCESSW>()).unwrap()
     }
 
+    pub fn alloc_zeroed(size: NonZeroUsize) -> Self {
+        let layout = Self::layout(size);
+        // SAFETY: the layout size is non-zero.
+        let Some(ptr) = NonNull::new(unsafe { alloc_zeroed(layout) }) else {
+            handle_alloc_error(layout);
+        };
+        Self { ptr, size }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size.get()
+    }
+
+    pub fn as_ptr(&self) -> *const u8 {
+        self.ptr.as_ptr()
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.ptr.as_ptr()
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+
+/// A buffer that contains a list of [`RawEnumServiceStatus`].
+pub struct RawEnumServices {
+    buffer: Buffer,
+    service_count: usize,
+}
+
+impl RawEnumServices {
     /// Creates [`EnumServices`] from its components.
     ///
     /// # Safety
     ///
-    /// - `buffer` must have been allocated with the global allocator using the [`Layout`] returned by [`Self::layout`]
-    /// - `buffer_size` must be the value passed to [`Self::layout`]
     /// - the buffer must successfully have been initialized with `EnumServicesStatusExW`
     /// - `service_count` must be the value returned by `EnumServicesStatusExW` via `lpServicesReturned`
-    pub(crate) unsafe fn from_parts(
-        buffer: NonNull<u8>,
-        buffer_size: usize,
-        service_count: usize,
-    ) -> Self {
+    pub(crate) unsafe fn from_parts(buffer: Buffer, service_count: usize) -> Self {
         Self {
             buffer,
-            buffer_size,
             service_count,
         }
     }

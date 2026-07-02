@@ -1,7 +1,6 @@
-use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error};
 use std::ffi::{OsStr, OsString};
+use std::num::NonZeroUsize;
 use std::os::windows::ffi::OsStringExt;
-use std::ptr::NonNull;
 use std::{io, ptr};
 
 use widestring::WideCString;
@@ -10,7 +9,9 @@ use windows_sys::Win32::System::Services::{self, EnumServicesStatusExW, SC_ENUM_
 
 use crate::sc_handle::ScHandle;
 use crate::service::{to_wide, RawServiceInfo, Service, ServiceAccess, ServiceInfo};
-use crate::service_enum::{EnumServiceState, EnumServiceStatus, EnumServiceType, RawEnumServices};
+use crate::service_enum::{
+    self, EnumServiceState, EnumServiceStatus, EnumServiceType, RawEnumServices,
+};
 use crate::{Error, Result};
 
 bitflags::bitflags! {
@@ -315,13 +316,8 @@ impl ServiceManager {
             }
         }
 
-        let buffer_size = required_buf_size as usize;
-        assert!(buffer_size != 0);
-        let buffer_layout = RawEnumServices::layout(buffer_size);
-        // SAFETY: the layout size is non-zero.
-        let Some(buffer) = NonNull::new(unsafe { alloc_zeroed(buffer_layout) }) else {
-            handle_alloc_error(buffer_layout);
-        };
+        let buffer_size = NonZeroUsize::new(required_buf_size as usize).unwrap();
+        let mut buffer = service_enum::Buffer::alloc_zeroed(buffer_size);
 
         let result = unsafe {
             EnumServicesStatusExW(
@@ -329,8 +325,8 @@ impl ServiceManager {
                 SC_ENUM_PROCESS_INFO,
                 service_type.bits(),
                 service_state.bits(),
-                buffer.as_ptr(),
-                buffer_size as u32,
+                buffer.as_mut_ptr(),
+                buffer.size() as u32,
                 &mut required_buf_size,
                 &mut returned_services,
                 &mut resume_handle,
@@ -339,14 +335,11 @@ impl ServiceManager {
         };
 
         if result == 0 {
-            // SAFETY: `buffer` has been allocated with the global allocator with this layout
-            unsafe { dealloc(buffer.as_ptr(), buffer_layout) };
-
             return Err(Error::Winapi(io::Error::last_os_error()));
         }
 
         // SAFETY: `buffer` has been successfully been initialized
-        Ok(unsafe { RawEnumServices::from_parts(buffer, buffer_size, returned_services as usize) })
+        Ok(unsafe { RawEnumServices::from_parts(buffer, returned_services as usize) })
     }
 
     /// Enumerates the services in the manager database.
