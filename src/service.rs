@@ -364,7 +364,7 @@ impl ServiceFailureActions {
 
 /// Enum describing the service launch protection options.
 ///
-/// See <https://learn.microsoft.com/ko-kr/windows/win32/api/winsvc/ns-winsvc-service_launch_protected_info>
+/// See <https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_launch_protected_info>
 /// for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -381,6 +381,7 @@ pub enum ServiceLaunchProtected {
     /// Launch protection used by antimalware (ELAM) services.
     AntimalwareLight = Services::SERVICE_LAUNCH_PROTECTED_ANTIMALWARE_LIGHT,
 }
+
 impl TryFrom<u32> for ServiceLaunchProtected {
     type Error = Error;
 
@@ -401,6 +402,7 @@ impl TryFrom<u32> for ServiceLaunchProtected {
         }
     }
 }
+
 /// A struct that describes the service.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServiceInfo {
@@ -1861,7 +1863,7 @@ impl Service {
             .map_err(Error::Winapi)
         }
     }
-    
+
     /// Get service launch protection.
     /// This is a security feature that allows the service to run in a more secure environment.
     pub fn get_launch_protected(&self) -> crate::Result<ServiceLaunchProtected> {
