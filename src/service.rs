@@ -510,7 +510,7 @@ pub struct ServiceConfig {
     /// Path to the service binary
     pub executable_path: PathBuf,
 
-    /// Path to the service binary
+    /// The service load order group.
     pub load_order_group: Option<OsString>,
 
     /// A unique tag value for this service in the group specified by the load_order_group
