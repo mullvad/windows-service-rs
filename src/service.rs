@@ -11,7 +11,10 @@ use widestring::{error::ContainsNul, WideCStr, WideCString, WideString};
 use windows_sys::{
     core::GUID,
     Win32::{
-        Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
+        Foundation::{
+            LocalFree, ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR,
+        },
+        Security::{self, Authorization},
         Storage::FileSystem,
         System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
@@ -1482,6 +1485,21 @@ pub enum ServiceSidType {
     Unrestricted = 1,
 }
 
+bitflags::bitflags! {
+    /// Flags selecting the parts of a service object's security descriptor to query or set.
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+    pub struct ServiceSecurityInformation: u32 {
+        /// The owner of the service object.
+        const OWNER = Security::OWNER_SECURITY_INFORMATION;
+
+        /// The primary group of the service object.
+        const GROUP = Security::GROUP_SECURITY_INFORMATION;
+
+        /// The discretionary access control list (DACL) of the service object.
+        const DACL = Security::DACL_SECURITY_INFORMATION;
+    }
+}
+
 /// A struct that represents a system service.
 ///
 /// The instances of the [`Service`] can be obtained via [`ServiceManager`].
@@ -1934,6 +1952,144 @@ impl Service {
             self.change_config2(Services::SERVICE_CONFIG_PRESHUTDOWN_INFO, &mut timeout)
                 .map_err(Error::Winapi)
         }
+    }
+
+    /// Query the security descriptor of the service object, in the Security Descriptor
+    /// Definition Language (SDDL) format, as printed by `sc sdshow`.
+    ///
+    /// Only the parts selected by `security_information` are queried.
+    ///
+    /// Required permission: [`ServiceAccess::READ_CONTROL`].
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service::{ServiceAccess, ServiceSecurityInformation};
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::READ_CONTROL)?;
+    /// let dacl = my_service.query_security_descriptor(ServiceSecurityInformation::DACL)?;
+    /// println!("{}", dacl.to_string_lossy());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn query_security_descriptor(
+        &self,
+        security_information: ServiceSecurityInformation,
+    ) -> crate::Result<OsString> {
+        // The descriptor holds 32-bit offsets, so back it with `u32` to keep it aligned.
+        let mut data: Vec<u32> = Vec::new();
+        loop {
+            let buffer_size = data.len() * mem::size_of::<u32>();
+            let mut bytes_needed: u32 = 0;
+            let success = unsafe {
+                Services::QueryServiceObjectSecurity(
+                    self.service_handle.raw_handle(),
+                    security_information.bits(),
+                    if data.is_empty() {
+                        ptr::null_mut()
+                    } else {
+                        data.as_mut_ptr() as _
+                    },
+                    buffer_size as u32,
+                    &mut bytes_needed,
+                )
+            };
+            if success != 0 {
+                break;
+            }
+            let error = io::Error::last_os_error();
+            // The descriptor can grow between the calls, so retry until the buffer is large enough.
+            if error.raw_os_error() != Some(ERROR_INSUFFICIENT_BUFFER as i32)
+                || bytes_needed as usize <= buffer_size
+            {
+                return Err(Error::Winapi(error));
+            }
+            data = vec![0u32; (bytes_needed as usize + 3) / 4];
+        }
+
+        let mut sddl_ptr: *mut u16 = ptr::null_mut();
+        let success = unsafe {
+            Authorization::ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                data.as_mut_ptr() as _,
+                Authorization::SDDL_REVISION_1,
+                security_information.bits(),
+                &mut sddl_ptr,
+                ptr::null_mut(),
+            )
+        };
+        if success == 0 {
+            return Err(Error::Winapi(io::Error::last_os_error()));
+        }
+
+        let sddl = unsafe { WideCStr::from_ptr_str(sddl_ptr) }.to_os_string();
+        unsafe { LocalFree(sddl_ptr as _) };
+        Ok(sddl)
+    }
+
+    /// Set the security descriptor of the service object from a string in the Security
+    /// Descriptor Definition Language (SDDL) format, like `sc sdset` does.
+    ///
+    /// Only the parts selected by `security_information` are applied, the rest of `sddl` is
+    /// ignored.
+    ///
+    /// Required permission: [`ServiceAccess::WRITE_DAC`] to set the DACL and
+    /// [`ServiceAccess::WRITE_OWNER`] to set the owner or the group.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service::{ServiceAccess, ServiceSecurityInformation};
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::WRITE_DAC)?;
+    /// // Full access for local system and administrators, start and query for interactive users.
+    /// my_service.set_security_descriptor(
+    ///     ServiceSecurityInformation::DACL,
+    ///     "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;RPLCRC;;;IU)",
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_security_descriptor(
+        &self,
+        security_information: ServiceSecurityInformation,
+        sddl: impl AsRef<OsStr>,
+    ) -> crate::Result<()> {
+        let sddl = WideCString::from_os_str(sddl)
+            .map_err(|_| Error::ArgumentHasNulByte("security descriptor"))?;
+
+        let mut descriptor: Security::PSECURITY_DESCRIPTOR = ptr::null_mut();
+        let success = unsafe {
+            Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl.as_ptr(),
+                Authorization::SDDL_REVISION_1,
+                &mut descriptor,
+                ptr::null_mut(),
+            )
+        };
+        if success == 0 {
+            return Err(Error::Winapi(io::Error::last_os_error()));
+        }
+
+        let success = unsafe {
+            Services::SetServiceObjectSecurity(
+                self.service_handle.raw_handle(),
+                security_information.bits(),
+                descriptor,
+            )
+        };
+        let result = if success == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            Ok(())
+        };
+        unsafe { LocalFree(descriptor) };
+        result
     }
 
     /// Private helper to send the control commands to the system.
