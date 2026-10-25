@@ -1682,6 +1682,50 @@ impl Service {
         }
     }
 
+    /// Change the start type of the service, leaving the rest of its config untouched.
+    ///
+    /// Unlike [`Service::change_config`], this does not require a full [`ServiceInfo`], so the
+    /// launch command, account and dependencies of the service are kept as they are.
+    ///
+    /// Required permission: [`ServiceAccess::CHANGE_CONFIG`].
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use windows_service::service::{ServiceAccess, ServiceStartType};
+    /// use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    ///
+    /// # fn main() -> windows_service::Result<()> {
+    /// let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    /// let my_service = manager.open_service("my_service", ServiceAccess::CHANGE_CONFIG)?;
+    /// my_service.set_start_type(ServiceStartType::OnDemand)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_start_type(&self, start_type: ServiceStartType) -> crate::Result<()> {
+        let success = unsafe {
+            Services::ChangeServiceConfigW(
+                self.service_handle.raw_handle(),
+                Services::SERVICE_NO_CHANGE,
+                start_type.to_raw(),
+                Services::SERVICE_NO_CHANGE,
+                ptr::null(),     // binary path
+                ptr::null(),     // load ordering group
+                ptr::null_mut(), // tag id within the load ordering group
+                ptr::null(),     // dependencies
+                ptr::null(),     // account name
+                ptr::null(),     // account password
+                ptr::null(),     // display name
+            )
+        };
+
+        if success == 0 {
+            Err(Error::Winapi(io::Error::last_os_error()))
+        } else {
+            Ok(())
+        }
+    }
+
     /// Configure failure actions to run when the service terminates before reporting the
     /// [`ServiceState::Stopped`] back to the system or if it exits with non-zero
     /// [`ServiceExitCode`].
